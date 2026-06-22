@@ -277,7 +277,7 @@ export function checkTriple(player: PlayerState): void {
 
 /** 生成三连奖励三选一：从比当前酒馆等级 +1 星级的随从池中随机选 3 张 */
 export function generateTripleReward(player: PlayerState): CardDef[] {
-  const rewardTier = Math.min(6, player.tavernTier + 1)
+  const rewardTier = Math.min(5, player.tavernTier + 1)
   const pool = CARDS.filter((c) => c.tier === rewardTier)
   const rewards: CardDef[] = []
   const used = new Set<number>()
