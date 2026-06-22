@@ -5,3 +5,4 @@ TEAM_TECH_AUDIT.md
 /dist
 /.build-tmp
 *.log
+.nezha/config.toml

@@ -400,6 +400,17 @@ function cleanupDead(
             break
           }
         }
+      } else if (e.target === 'randomAlly' && finalBoard.length > 0) {
+        const allies = finalBoard.filter((a) => a.uid !== m.uid)
+        if (allies.length > 0 && e.divineShield) {
+          const target = allies[Math.floor(Math.random() * allies.length)]
+          target.divineShield = true
+          steps.push({
+            type: 'info',
+            snap: makeSnapFromArr(finalBoard),
+            text: `【${m.name}】亡语：给予【${target.name}】圣盾`,
+          })
+        }
       }
     }
     // 无复生无召唤：随从消失，不加入 finalBoard

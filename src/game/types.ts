@@ -23,6 +23,7 @@ export type EffectTarget =
   | 'allAlliesOfTribe' // 同族友方
   | 'summonMinion' // 召唤衍生物
   | 'damageRandomEnemy' // 随机敌随从伤害
+  | 'randomAlly' // 随机友方随从
   | 'none'
 
 /** 效果动作 */
