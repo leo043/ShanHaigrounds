@@ -417,7 +417,7 @@ function cleanupDead(
   return finalBoard
 }
 
-/** 计算随从造成的伤害部分 = 存活随从星级之和（金卡星级翻倍） */
+/** 计算随从造成的伤害部分 = 存活随从星级之和 */
 function tierDamage(board: Minion[]): number {
-  return board.reduce((s, m) => s + (m.golden ? m.tier * 2 : m.tier), 0)
+  return board.reduce((s, m) => s + m.tier, 0)
 }
