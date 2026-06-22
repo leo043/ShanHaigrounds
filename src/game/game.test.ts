@@ -1,12 +1,11 @@
 // game.ts 核心逻辑单元测试 - 金币/升级/三连/英雄技能/买卖
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import {
   createGame,
   createPlayer,
   createMinion,
   buyMinion,
   sellMinion,
-  playMinion,
   swapMinions,
   refreshTavern,
   freezeTavern,
@@ -20,7 +19,7 @@ import {
   applyTripleReward,
   resetUid,
 } from './game'
-import { CARD_MAP, HEROES, CARDS } from './cards'
+import { CARD_MAP, CARDS } from './cards'
 import { goldForTurn, UPGRADE_BASE_COST, TAVERN_OFFER_COUNT } from './types'
 import type { PlayerState } from './types'
 
