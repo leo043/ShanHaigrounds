@@ -167,7 +167,12 @@ export function simulateCombat(state: GameState): CombatResult {
     pBoard = cleanupDead('player', pBoard, eBoard, steps);
     eBoard = cleanupDead('enemy', eBoard, pBoard, steps);
 
-    turn = turn === 'player' ? 'enemy' : 'player';
+    // 风怒：如果攻击者还能攻击，不切换回合
+    const currentAtkBoard = atkSide === 'player' ? pBoard : eBoard;
+    const attackerStillCanAttack = currentAtkBoard.includes(attacker) && canAttack(attacker);
+    if (!attackerStillCanAttack) {
+      turn = turn === 'player' ? 'enemy' : 'player';
+    }
   }
 
   // 判定胜负 + 英雄伤害
