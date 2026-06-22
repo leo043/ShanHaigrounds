@@ -1,10 +1,9 @@
 // UI 渲染主协调 - GameUI 类、英雄选择、阶段渲染与交互绑定
 import type { GameState, Minion, CardDef } from '../game/types'
-import { KEYWORD_NAMES, HEROES, CARDS } from '../game/cards'
+import { HEROES, CARDS } from '../game/cards'
 import { toggleMute, isMuted } from '../game/audio'
-import { MINION_IMAGES, HERO_IMAGES } from '../config/assets'
-import { escapeAttr, cardDefTooltipHtml, TRIBE_CHAR } from './tooltip'
-import { minionHtml, heroHtml, codexCardHtml } from './cards'
+import { HERO_IMAGES } from '../config/assets'
+import { minionHtml, heroHtml, codexCardHtml, rewardCardHtml } from './cards'
 
 export type Selection = { type: 'hand'; uid: string } | { type: 'board'; uid: string } | null
 
@@ -271,40 +270,7 @@ export class GameUI {
   /** 渲染三连奖励三选一面板 */
   renderTripleReward(rewards: CardDef[]): void {
     const s = this.state
-    const cardsHtml = rewards
-      .map((def) => {
-        const tooltip = escapeAttr(cardDefTooltipHtml(def))
-        const imgSrc = MINION_IMAGES[def.id] ?? ''
-        const imgHtml = imgSrc
-          ? `<img class="card-img" src="${imgSrc}" alt="${def.name}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="card-art-fallback" style="display:none">${def.name.charAt(0)}</div>`
-          : `<div class="card-art">${def.name.charAt(0)}</div>`
-        const kwBadges = (def.keywords ?? [])
-          .map((k) => {
-            const cls =
-              k === 'taunt'
-                ? 'taunt'
-                : k === 'divineShield'
-                  ? 'shield'
-                  : k === 'reborn'
-                    ? 'reborn'
-                    : k === 'poison'
-                      ? 'poison'
-                      : 'windfury'
-            return `<span class="kw-badge k-${cls}">${KEYWORD_NAMES[k].charAt(0)}</span>`
-          })
-          .join('')
-        return `<div class="card reward-card tribe-${def.tribe} ${def.keywords?.includes('taunt') ? 'has-taunt' : ''}" data-reward-id="${def.id}" data-tooltip="${tooltip}">
-        <div class="card-frame">
-          <div class="card-stars">${'★'.repeat(def.tier)}</div>
-          <div class="card-tribe t-${def.tribe}">${TRIBE_CHAR[def.tribe]}</div>
-          <div class="card-keywords">${kwBadges}</div>
-          ${imgHtml}
-        </div>
-        <div class="card-atk">${def.attack}</div>
-        <div class="card-hp">${def.health}</div>
-      </div>`
-      })
-      .join('')
+    const cardsHtml = rewards.map((def) => rewardCardHtml(def, def.id)).join('')
 
     this.root.innerHTML = `
       <div class="topbar">
@@ -529,7 +495,9 @@ export class GameUI {
         }
         const atkEl = el.querySelector('.card-atk')
         if (atkEl) atkEl.textContent = String(m.attack)
+        // 关键词视觉层显隐由 has-* class 控制（CSS 层面），无需操作 DOM 子元素
         el.classList.toggle('has-shield', m.divineShield)
+        el.classList.toggle('has-reborn', m.keywords.includes('reborn') && !m.rebornUsed)
       }
     }
     updateSide(pBoard, '#player-board')

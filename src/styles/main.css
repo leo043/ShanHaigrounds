@@ -465,147 +465,282 @@ body {
   }
 }
 
-/* ============ 卡牌关键词视觉特效 ============ */
+/* ============ 卡牌关键词视觉特效（五层视觉栈）============ */
+/* 架构：①底座光环 .kw-floor → ②卡牌主体 → ③外发光 .kw-aura → ④顶部带子 .kw-banner → ⑤图标 .kw-icon
+   每个关键词独立 DOM 层，避免伪元素 ::before/::after 冲突。
+   显隐由父级 .has-* class 控制，运行时 updateCombatHp 切换 class 即可。 */
 
-/* 嘲讽：红色盾牌边框 + 外发光（防御感） */
-.card.has-taunt .card-frame {
-  border-width: 3px;
-  border-color: var(--vermilion);
-  box-shadow:
-    inset 0 0 0 1px rgba(255, 200, 200, 0.5),
-    0 0 10px rgba(192, 57, 43, 0.55);
-}
-.card.has-taunt::before {
-  content: '';
-  position: absolute;
-  inset: -4px;
-  border-radius: 10px;
-  border: 2px solid var(--vermilion);
-  border-style: dashed;
-  pointer-events: none;
-  z-index: 1;
-  animation: tauntPulse 2s ease-in-out infinite;
-}
-@keyframes tauntPulse {
-  0%,
-  100% {
-    opacity: 0.5;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.9;
-    transform: scale(1.03);
-  }
+/* 默认隐藏所有关键词层（仅当父级有对应 has-* 时显示） */
+.kw-floor,
+.kw-aura,
+.kw-banner,
+.kw-icon-divineShield,
+.kw-icon-reborn {
+  display: none;
 }
 
-/* 圣盾：金色透明光环罩（改用金色，更神圣） */
-.card.has-shield::after {
-  content: '';
+/* ---- 底座光环（卡牌下方椭圆光斑，远距离可识别的颜色锚点）---- */
+.kw-floor {
   position: absolute;
-  inset: -2px;
-  border-radius: 10px;
-  background: radial-gradient(ellipse at center, rgba(255, 215, 100, 0.18), transparent 70%);
-  box-shadow:
-    inset 0 0 0 2px rgba(232, 201, 122, 0.95),
-    inset 0 0 18px rgba(255, 215, 100, 0.5),
-    0 0 12px rgba(232, 201, 122, 0.6);
+  left: 50%;
+  bottom: -6px;
+  width: 96%;
+  height: 14px;
+  border-radius: 50%;
+  transform: translateX(-50%);
   pointer-events: none;
-  z-index: 3;
-  animation: shieldShimmer 2.5s ease-in-out infinite;
+  z-index: 0;
+  filter: blur(2px);
+  animation: kwFloorPulse 2s ease-in-out infinite;
 }
-@keyframes shieldShimmer {
+.kw-floor-taunt {
+  background: radial-gradient(ellipse, rgba(192, 57, 43, 0.7), transparent 70%);
+}
+.kw-floor-divineShield {
+  background: radial-gradient(ellipse, rgba(232, 201, 122, 0.8), transparent 70%);
+}
+.kw-floor-reborn {
+  background: radial-gradient(ellipse, rgba(46, 125, 107, 0.7), transparent 70%);
+}
+.kw-floor-poison {
+  background: radial-gradient(ellipse, rgba(123, 75, 148, 0.7), transparent 70%);
+}
+.kw-floor-windfury {
+  background: radial-gradient(ellipse, rgba(58, 110, 165, 0.7), transparent 70%);
+}
+@keyframes kwFloorPulse {
   0%,
   100% {
-    box-shadow:
-      inset 0 0 0 2px rgba(232, 201, 122, 0.95),
-      inset 0 0 18px rgba(255, 215, 100, 0.5),
-      0 0 12px rgba(232, 201, 122, 0.6);
-  }
-  50% {
-    box-shadow:
-      inset 0 0 0 2px rgba(255, 235, 160, 1),
-      inset 0 0 26px rgba(255, 215, 100, 0.75),
-      0 0 20px rgba(232, 201, 122, 0.9);
-  }
-}
-
-/* 复生：绿色灵气光环 + 飘动光点 */
-.card.has-reborn .card-frame {
-  box-shadow: inset 0 0 12px rgba(46, 125, 107, 0.45);
-}
-.card.has-reborn::before {
-  content: '';
-  position: absolute;
-  inset: -3px;
-  border-radius: 10px;
-  border: 2px solid rgba(46, 125, 107, 0.7);
-  pointer-events: none;
-  z-index: 1;
-  animation: rebornGlow 2s ease-in-out infinite;
-}
-@keyframes rebornGlow {
-  0%,
-  100% {
-    box-shadow: 0 0 6px rgba(46, 125, 107, 0.4);
-    opacity: 0.6;
-  }
-  50% {
-    box-shadow: 0 0 16px rgba(46, 125, 107, 0.8);
-    opacity: 1;
-  }
-}
-
-/* 剧毒：紫色毒雾光晕 */
-.card.has-poison .card-frame {
-  box-shadow: inset 0 0 12px rgba(123, 75, 148, 0.5);
-}
-.card.has-poison::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: 8px;
-  background: radial-gradient(ellipse at top, rgba(155, 89, 182, 0.35), transparent 60%);
-  pointer-events: none;
-  z-index: 3;
-  animation: poisonBubble 3s ease-in-out infinite;
-}
-@keyframes poisonBubble {
-  0%,
-  100% {
-    opacity: 0.5;
+    opacity: 0.55;
+    transform: translateX(-50%) scaleX(1);
   }
   50% {
     opacity: 0.85;
+    transform: translateX(-50%) scaleX(1.08);
   }
 }
 
-/* 风怒：蓝色旋风环绕 */
-.card.has-windfury .card-frame {
-  box-shadow: inset 0 0 10px rgba(58, 110, 165, 0.5);
-}
-.card.has-windfury::before {
-  content: '';
+/* ---- 外发光层（环绕卡牌的彩色光环）---- */
+.kw-aura {
   position: absolute;
   inset: -3px;
   border-radius: 10px;
-  border: 2px solid rgba(58, 110, 165, 0.6);
-  border-top-color: rgba(120, 180, 255, 0.95);
   pointer-events: none;
   z-index: 1;
-  animation: windSpin 1.5s linear infinite;
+  animation: kwAuraPulse 2s ease-in-out infinite;
 }
-@keyframes windSpin {
-  0% {
-    transform: rotate(0deg);
-    opacity: 0.6;
+.kw-aura-taunt {
+  border: 2px dashed rgba(192, 57, 43, 0.85);
+  box-shadow: 0 0 12px rgba(192, 57, 43, 0.5);
+}
+.kw-aura-divineShield {
+  border: 2px solid rgba(232, 201, 122, 0.95);
+  box-shadow:
+    0 0 14px rgba(232, 201, 122, 0.7),
+    inset 0 0 18px rgba(255, 215, 100, 0.4);
+}
+.kw-aura-reborn {
+  border: 2px solid rgba(46, 125, 107, 0.85);
+  box-shadow: 0 0 12px rgba(46, 125, 107, 0.5);
+}
+.kw-aura-poison {
+  border: 2px solid rgba(123, 75, 148, 0.85);
+  box-shadow: 0 0 12px rgba(155, 89, 182, 0.5);
+}
+.kw-aura-windfury {
+  border: 2px solid rgba(58, 110, 165, 0.7);
+  border-top-color: rgba(120, 180, 255, 0.95);
+  box-shadow: 0 0 10px rgba(58, 110, 165, 0.5);
+  animation: kwWindSpin 2s linear infinite;
+}
+@keyframes kwAuraPulse {
+  0%,
+  100% {
+    opacity: 0.65;
   }
   50% {
     opacity: 1;
   }
+}
+@keyframes kwWindSpin {
+  0% {
+    transform: rotate(0deg);
+  }
   100% {
     transform: rotate(360deg);
-    opacity: 0.6;
   }
+}
+
+/* ---- 顶部带子（关键词名称条，最直观的文字标识）---- */
+.kw-banner {
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 1px 8px;
+  border-radius: 3px;
+  font-family: var(--font-calligraphy);
+  font-size: 10px;
+  font-weight: 500;
+  color: #fff;
+  letter-spacing: 1px;
+  white-space: nowrap;
+  z-index: 8;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+  animation: kwBannerFloat 1.8s ease-in-out infinite;
+}
+.kw-banner-taunt {
+  background: linear-gradient(135deg, #c0392b, #7a1f15);
+}
+.kw-banner-divineShield {
+  background: linear-gradient(135deg, #e8c97a, #c9a14a);
+  color: var(--ink-black);
+  text-shadow: 0 1px 1px rgba(255, 255, 255, 0.3);
+}
+.kw-banner-reborn {
+  background: linear-gradient(135deg, #2e7d6b, #1e5e51);
+}
+.kw-banner-poison {
+  background: linear-gradient(135deg, #9b59b6, #6c3483);
+}
+.kw-banner-windfury {
+  background: linear-gradient(135deg, #5dade2, #2e86c1);
+}
+@keyframes kwBannerFloat {
+  0%,
+  100% {
+    transform: translateX(-50%) translateY(0);
+  }
+  50% {
+    transform: translateX(-50%) translateY(-2px);
+  }
+}
+
+/* ---- 右上角图形图标徽章（SVG 矢量图标，所有激活关键词都显示）---- */
+.card-keywords {
+  position: absolute;
+  top: 12px;
+  left: 2px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  z-index: 4;
+}
+.kw-icon {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  padding: 2px;
+  color: #fff;
+}
+.kw-icon-taunt {
+  background: var(--vermilion);
+  display: flex;
+}
+.kw-icon-divineShield {
+  background: radial-gradient(circle, #ffe082, #c9a14a);
+  color: var(--ink-black);
+}
+.kw-icon-reborn {
+  background: var(--jade);
+}
+.kw-icon-poison {
+  background: linear-gradient(135deg, #9b59b6, #6c3483);
+}
+.kw-icon-windfury {
+  background: linear-gradient(135deg, #5dade2, #2e86c1);
+}
+
+/* 显隐联动：父级 has-* class 控制对应层显示 */
+.card.has-taunt .kw-floor-taunt,
+.card.has-taunt .kw-aura-taunt,
+.card.has-taunt .kw-banner-taunt,
+.card.has-taunt .kw-icon-taunt {
+  display: flex;
+}
+
+.card.has-shield .kw-floor-divineShield,
+.card.has-shield .kw-aura-divineShield,
+.card.has-shield .kw-banner-divineShield,
+.card.has-shield .kw-icon-divineShield {
+  display: flex;
+}
+
+.card.has-reborn .kw-floor-reborn,
+.card.has-reborn .kw-aura-reborn,
+.card.has-reborn .kw-banner-reborn,
+.card.has-reborn .kw-icon-reborn {
+  display: flex;
+}
+
+.card.has-poison .kw-floor-poison,
+.card.has-poison .kw-aura-poison,
+.card.has-poison .kw-banner-poison,
+.card.has-poison .kw-icon-poison {
+  display: flex;
+}
+
+.card.has-windfury .kw-floor-windfury,
+.card.has-windfury .kw-aura-windfury,
+.card.has-windfury .kw-banner-windfury,
+.card.has-windfury .kw-icon-windfury {
+  display: flex;
+}
+
+/* 卡牌边框强化（保留原有 .card-frame 调整，强化色彩识别）*/
+.card.has-taunt .card-frame {
+  border-width: 3px;
+  border-color: var(--vermilion);
+}
+.card.has-shield .card-frame {
+  border-color: var(--gold-light);
+  box-shadow: inset 0 0 14px rgba(232, 201, 122, 0.55);
+}
+.card.has-reborn .card-frame {
+  border-color: var(--jade);
+  box-shadow: inset 0 0 12px rgba(46, 125, 107, 0.4);
+}
+.card.has-poison .card-frame {
+  border-color: #7b4b94;
+  box-shadow: inset 0 0 12px rgba(123, 75, 148, 0.45);
+}
+.card.has-windfury .card-frame {
+  border-color: var(--azure);
+  box-shadow: inset 0 0 10px rgba(58, 110, 165, 0.45);
+}
+
+/* 旧版 .kw-badge 兼容（图鉴等处可能仍用）*/
+.kw-badge {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  color: #fff;
+  font-weight: bold;
+}
+.kw-badge.k-taunt {
+  background: var(--vermilion);
+}
+.kw-badge.k-shield {
+  background: radial-gradient(circle, #ffe082, #c9a14a);
+}
+.kw-badge.k-reborn {
+  background: var(--jade);
+}
+.kw-badge.k-poison {
+  background: linear-gradient(135deg, #9b59b6, #6c3483);
+}
+.kw-badge.k-windfury {
+  background: linear-gradient(135deg, #5dade2, #2e86c1);
 }
 
 /* 三连待触发：金色脉冲提示（打出此卡触发奖励） */
@@ -797,43 +932,6 @@ body {
 }
 .card-tribe.t-spirit {
   background: var(--tribe-spirit);
-}
-
-/* 关键词标记 */
-.card-keywords {
-  position: absolute;
-  top: 12px;
-  left: 2px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  z-index: 2;
-}
-.kw-badge {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 9px;
-  color: #fff;
-  font-weight: bold;
-}
-.kw-badge.k-taunt {
-  background: var(--vermilion);
-}
-.kw-badge.k-shield {
-  background: radial-gradient(circle, #ffe082, #c9a14a);
-}
-.kw-badge.k-reborn {
-  background: var(--jade);
-}
-.kw-badge.k-poison {
-  background: linear-gradient(135deg, #9b59b6, #6c3483);
-}
-.kw-badge.k-windfury {
-  background: linear-gradient(135deg, #5dade2, #2e86c1);
 }
 
 /* ============ 卡片 tooltip 悬停详情（大图+侧边效果） ============ */

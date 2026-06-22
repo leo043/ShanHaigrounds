@@ -9,7 +9,6 @@ export const MINION_IMAGES: Record<string, string> = {
   human_swordsman: '/images/minions/human_swordsman.png',
   human_monk: '/images/minions/human_monk.png',
   human_general: '/images/minions/human_general.png',
-  human_strategist: '/images/minions/human_strategist.png',
   human_immortal: '/images/minions/human_immortal.png',
   human_baima: '/images/minions/human_baima.png',
   human_huben: '/images/minions/human_huben.png',

@@ -55,16 +55,6 @@ export const CARDS: CardDef[] = [
     flavor: '三军司命，号令如山。',
   },
   {
-    id: 'human_strategist',
-    name: '运筹谋士',
-    tribe: 'human',
-    tier: 3,
-    attack: 2,
-    health: 4,
-    effects: [{ trigger: 'endOfTurn', target: 'allAllies', buffAttack: 1 }],
-    flavor: '运筹帷幄，决胜千里。',
-  },
-  {
     id: 'human_immortal',
     name: '不死剑仙',
     tribe: 'human',
