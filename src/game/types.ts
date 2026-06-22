@@ -75,7 +75,7 @@ export interface Minion {
 /** 英雄技能 id（决定被动效果触发点） */
 export type HeroPower =
   | 'armorStart' // 玄武：开局 +5 护甲
-  | 'saveOnce' // 朱雀：每局首次战败少受 5 伤
+  | 'nirvana' // 朱雀：首次死亡时以 1 血复活
   | 'freeRefreshOnce' // 白虎：每回合首次刷新免费
   | 'goldPlusOne' // 青龙：每回合开始 +1 金
   | 'startTier2' // 麒麟：开局酒馆 2 级

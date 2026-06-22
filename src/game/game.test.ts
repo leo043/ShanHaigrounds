@@ -99,9 +99,9 @@ describe('金币系统', () => {
 })
 
 describe('createPlayer / 英雄技能', () => {
-  it('玄武应开局获得 5 护甲', () => {
+  it('玄武应开局获得 10 护甲', () => {
     const p = makePlayer('hero_xuanwu')
-    expect(p.hero.armor).toBe(5)
+    expect(p.hero.armor).toBe(10)
   })
 
   it('麒麟应开局酒馆 2 级，升级费对应 2→3', () => {
@@ -365,36 +365,41 @@ describe('generateTripleReward / applyTripleReward', () => {
 })
 
 describe('dealDamageToHero / 朱雀技能', () => {
-  it('朱雀首次受伤应减5（保命技能）', () => {
+  it('朱雀首次致死伤害应以1血复活', () => {
     const state = createGame('hero_zhuque', 'hero_xuanwu')
-    const initialHp = state.player.hero.health
-    dealDamageToHero(state, 'player', 8)
-    // 8 - 5 = 3 实际伤害
-    expect(state.player.hero.health).toBe(initialHp - 3)
+    dealDamageToHero(state, 'player', 100) // 致死伤害
+    expect(state.player.hero.health).toBe(1)
     expect(state.player.hero.saveUsed).toBe(true)
   })
 
-  it('朱雀第二次受伤不减免', () => {
+  it('朱雀非致死伤害正常扣血', () => {
+    const state = createGame('hero_zhuque', 'hero_xuanwu')
+    const initialHp = state.player.hero.health
+    dealDamageToHero(state, 'player', 5) // 非致死
+    expect(state.player.hero.health).toBe(initialHp - 5)
+    expect(state.player.hero.saveUsed).toBeFalsy()
+  })
+
+  it('朱雀涅槃已用后再次致死应正常死亡', () => {
     const state = createGame('hero_zhuque', 'hero_xuanwu')
     state.player.hero.saveUsed = true
-    const initialHp = state.player.hero.health
-    dealDamageToHero(state, 'player', 8)
-    expect(state.player.hero.health).toBe(initialHp - 8)
+    dealDamageToHero(state, 'player', 100)
+    expect(state.player.hero.health).toBe(-65)
   })
 
   it('玄武护甲应优先吸收伤害', () => {
     const state = createGame('hero_xuanwu', 'hero_baihu')
-    // 玄武 5 护甲
+    // 玄武 10 护甲
     dealDamageToHero(state, 'player', 3)
-    expect(state.player.hero.armor).toBe(2) // 5-3=2
+    expect(state.player.hero.armor).toBe(7) // 10-3=7
     expect(state.player.hero.health).toBe(40) // 未扣血
   })
 
   it('护甲吸收后溢出伤害应扣血', () => {
     const state = createGame('hero_xuanwu', 'hero_baihu')
-    dealDamageToHero(state, 'player', 10)
-    expect(state.player.hero.armor).toBe(0) // 5护甲吸完
-    expect(state.player.hero.health).toBe(35) // 40 - (10-5) = 35
+    dealDamageToHero(state, 'player', 15)
+    expect(state.player.hero.armor).toBe(0) // 10护甲吸完
+    expect(state.player.hero.health).toBe(35) // 40 - (15-10) = 35
   })
 })
 

@@ -416,20 +416,25 @@ export function checkGameOver(state: GameState): void {
   }
 }
 
-/** 玩家受到战斗伤害（朱雀英雄：每局首次战败少受 5 伤） */
+/** 玩家受到战斗伤害（朱雀英雄：首次死亡时以 1 血复活） */
 export function dealDamageToHero(state: GameState, who: 'player' | 'enemy', dmg: number): void {
   const target = who === 'player' ? state.player : state.enemy
   let remaining = dmg
-  // 朱雀技能：首次承受伤害时减 5（只在血量会因此扣到 0 以下时触发，更有"保命"体验）
-  if (target.hero.power === 'saveOnce' && !target.hero.saveUsed && remaining > 0) {
-    remaining = Math.max(0, remaining - 5)
-    target.hero.saveUsed = true
-  }
   if (target.hero.armor > 0) {
     const absorbed = Math.min(target.hero.armor, remaining)
     target.hero.armor -= absorbed
-    target.hero.health -= remaining - absorbed
-  } else {
-    target.hero.health -= remaining
+    remaining -= absorbed
   }
+  // 朱雀技能：首次死亡时以 1 血复活（只在血量会扣到 ≤0 时触发）
+  if (
+    target.hero.power === 'nirvana' &&
+    !target.hero.saveUsed &&
+    remaining > 0 &&
+    target.hero.health - remaining <= 0
+  ) {
+    target.hero.health = 1
+    target.hero.saveUsed = true
+    return
+  }
+  target.hero.health -= remaining
 }
