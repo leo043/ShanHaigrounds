@@ -14,25 +14,48 @@
   --tribe-demon: #7b4b94;
   --tribe-spirit: #c9a14a;
   --shadow: rgba(43, 38, 32, 0.25);
+
+  /* ===== 安全区域变量（用于全面屏/刘海/打孔屏适配）=====
+     env() 在老 WebView 不识别时回退到 0px，配合 max() 保证不小于其他值。
+     横屏游戏：top/bottom 通常是状态栏/手势条；left/right 是横屏下的刘海/曲面屏边缘。 */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+
+  /* 内容区左右内边距：横屏下要让交互元素避开刘海/曲面边缘 */
+  --gutter-x: 20px;
+  --gutter-x-safe: max(var(--gutter-x), var(--safe-left));
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 html, body {
+  /* 用 100% 而非 100vh，避免 Android WebView 100vh 含状态栏导致底部被裁 */
   height: 100%;
+  width: 100%;
   font-family: 'Noto Serif SC', 'Songti SC', serif;
   color: var(--ink-black);
   user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
   overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: manipulation;
 }
 
 #app {
-  width: 100vw; height: 100vh;
+  /* 关键：100dvh 是动态视口高度（随系统栏显隐更新），旧 WebView 回退到 100vh */
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
   background:
     radial-gradient(ellipse at top, rgba(201,161,74,.15), transparent 60%),
     radial-gradient(ellipse at bottom, rgba(192,57,43,.08), transparent 60%),
     linear-gradient(180deg, #e8dcc0, #d9ccb0);
   display: flex; flex-direction: column; position: relative;
+  /* 让 #app 整体铺满（含安全区，背景纹理延伸到刘海下方），内部子元素各自避让 */
 }
 #app::before {
   content:''; position:absolute; inset:0;
@@ -44,6 +67,10 @@ html, body {
 .topbar {
   display:flex; justify-content:space-between; align-items:center;
   padding:6px 20px;
+  /* 横屏下顶部状态栏已隐藏（沉浸式），但刘海/打孔可能在左右侧 → 顶部用 max 保证安全 */
+  padding-top: max(6px, var(--safe-top));
+  padding-left: var(--gutter-x-safe);
+  padding-right: max(var(--gutter-x), var(--safe-right));
   background:linear-gradient(180deg,rgba(43,38,32,.88),rgba(43,38,32,.72));
   color:var(--bg-paper);
   border-bottom:2px solid var(--gold); z-index:10; flex-shrink:0;
@@ -75,6 +102,8 @@ html, body {
 /* ============ 控制按钮行（对齐官方：升级★ 刷新↻ 冻结❄ 金币） ============ */
 .control-row {
   display:flex; align-items:center; gap:6px; padding:6px 20px;
+  padding-left: var(--gutter-x-safe);
+  padding-right: max(var(--gutter-x), var(--safe-right));
   background:linear-gradient(180deg,rgba(201,161,74,.18),rgba(201,161,74,.08));
   border-bottom:1px solid rgba(201,161,74,.35); flex-shrink:0;
   z-index:9;
@@ -130,7 +159,10 @@ html, body {
 /* ============ 主区域 ============ */
 .main-area {
   flex:1;display:flex;flex-direction:column;gap:6px;
-  padding:8px 16px;overflow:hidden;position:relative;z-index:1;
+  padding:8px 16px;
+  padding-left: max(16px, var(--safe-left));
+  padding-right: max(16px, var(--safe-right));
+  overflow:hidden;position:relative;z-index:1;
 }
 
 .row-label {
@@ -175,11 +207,15 @@ html, body {
 .hand-row {
   display:flex;align-items:flex-end;gap:8px;flex-shrink:0;
   min-height:124px;padding:4px 0;
+  /* 底部安全区：避开手势导航条 */
+  padding-bottom: max(4px, var(--safe-bottom));
   border-top:1px dashed rgba(201,161,74,.4);
 }
 .hand-zone{
   display:flex;gap:6px;flex:1;overflow-x:auto;
   min-height:118px;align-items:flex-end;padding:4px 6px;
+  padding-left: max(6px, var(--safe-left));
+  padding-right: max(6px, var(--safe-right));
 }
 
 /* 提示条 */
@@ -563,6 +599,9 @@ html, body {
 /* ============ 战斗日志 ============ */
 .combat-log{
   position:absolute;right:12px;top:8px;width:260px;max-height:calc(100% - 16px);
+  /* 避开横屏下的右侧刘海/曲面边缘 */
+  right: max(12px, var(--safe-right));
+  top: max(8px, var(--safe-top));
   background:rgba(43,38,32,.9);color:var(--bg-paper);
   border:2px solid var(--gold);border-radius:6px;padding:8px;
   font-size:11px;overflow-y:auto;z-index:20;display:none;
@@ -580,6 +619,11 @@ html, body {
 .gameover-overlay{
   position:absolute;inset:0;background:rgba(0,0,0,.75);
   display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:100;
+  padding:24px;
+  padding-top: max(24px, var(--safe-top));
+  padding-bottom: max(24px, var(--safe-bottom));
+  padding-left: max(24px, var(--safe-left));
+  padding-right: max(24px, var(--safe-right));
 }
 .gameover-overlay h1{
   font-family:'Ma Shan Zheng',cursive;font-size:72px;color:var(--gold-light);
@@ -644,7 +688,13 @@ html, body {
 .hero-select-overlay{
   width:100%;height:100%;
   display:flex;flex-direction:column;align-items:center;justify-content:center;
-  padding:32px 20px;gap:24px;
+  padding:32px 20px;
+  /* 全屏覆盖层也要避开安全区 */
+  padding-top: max(32px, var(--safe-top));
+  padding-bottom: max(32px, var(--safe-bottom));
+  padding-left: max(20px, var(--safe-left));
+  padding-right: max(20px, var(--safe-right));
+  gap:24px;
   background:
     radial-gradient(ellipse at top, rgba(201,161,74,.22), transparent 65%),
     radial-gradient(ellipse at bottom, rgba(192,57,43,.12), transparent 65%),
@@ -726,44 +776,72 @@ html, body {
   letter-spacing:1px;opacity:.8;
 }
 
-/* ============ 手机横屏适配（max-height 500px = 手机横屏高度） ============
-   桌面浏览器高度 > 500px 不触发，不影响 PC 端体验。
-   参考官方酒馆战棋手机横屏布局：居中、紧凑、无日志侧栏。
+/* ============ 手机横屏适配 ============
+   原断点 max-height: 500px 覆盖主流手机横屏（横屏 CSS 高度多在 360~460）。
+   现扩展为多档：
+     · ≤540px → 紧凑布局（手机横屏）
+     · 触摸设备（pointer:coarse）→ 自动放大触摸目标
+   注意：所有 padding 简写都要保留 --safe-* 避让，否则刘海屏会被遮挡。
 */
-@media screen and (max-height: 500px) {
+@media screen and (max-height: 540px) {
 
-  /* ---- 顶部栏：紧凑化 ---- */
-  .topbar{padding:3px 10px}
+  /* ---- 顶部栏：紧凑化（保留 safe-area 顶部+左右避让） ---- */
+  .topbar{
+    padding:3px 10px;
+    padding-top: max(3px, var(--safe-top));
+    padding-left: max(10px, var(--safe-left));
+    padding-right: max(10px, var(--safe-right));
+  }
   .hero-portrait{width:34px;height:34px;border-width:1px}
   .hero-name{font-size:12px}
   .hero-stats{font-size:10px;gap:4px}
   .turn-info{font-size:12px}
 
-  /* ---- 控制行：更紧凑 ---- */
-  .control-row{padding:3px 10px;gap:4px}
+  /* ---- 控制行：更紧凑（保留 safe-area 左右避让） ---- */
+  .control-row{
+    padding:3px 10px;
+    padding-left: max(10px, var(--safe-left));
+    padding-right: max(10px, var(--safe-right));
+    gap:4px;
+  }
   .ctrl-btn{width:36px;height:42px;border-radius:4px;border-width:1px}
   .ctrl-icon{font-size:15px}
   .ctrl-cost{font-size:9px}
   .gold-display{font-size:12px}
 
-  /* ---- 主区域：减少内边距和间距 ---- */
-  .main-area{gap:3px;padding:4px 8px}
+  /* ---- 主区域：减少内边距和间距（保留 safe-area 左右避让） ---- */
+  .main-area{
+    gap:3px;padding:4px 8px;
+    padding-left: max(8px, var(--safe-left));
+    padding-right: max(8px, var(--safe-right));
+  }
 
   /* 行标签隐藏（节省水平空间） */
   .row-label{display:none}
 
   /* 酒馆行 */
   .tavern-row{min-height:80px;padding:2px 0;gap:4px}
-  .tavern-cards{min-height:76px;justify-content:center;gap:4px;padding:2px 4px}
+  .tavern-cards{
+    min-height:76px;justify-content:center;gap:4px;padding:2px 4px;
+    padding-left: max(4px, var(--safe-left));
+    padding-right: max(4px, var(--safe-right));
+  }
 
   /* 战场行 */
   .board-row{min-height:80px;padding:2px 0;gap:4px}
   .board-zone{min-height:76px;gap:4px;padding:3px;border-radius:4px}
   .board-slot{width:58px;height:82px;border-radius:5px}
 
-  /* 手牌行 */
-  .hand-row{min-height:88px;padding:2px 0;gap:4px}
-  .hand-zone{min-height:84px;justify-content:center;gap:4px;padding:2px 4px}
+  /* 手牌行（保留 safe-area 底部+左右避让） */
+  .hand-row{
+    min-height:88px;padding:2px 0;gap:4px;
+    padding-bottom: max(2px, var(--safe-bottom));
+  }
+  .hand-zone{
+    min-height:84px;justify-content:center;gap:4px;padding:2px 4px;
+    padding-left: max(4px, var(--safe-left));
+    padding-right: max(4px, var(--safe-right));
+  }
 
   /* 提示条：缩小或隐藏 */
   .hint-bar{font-size:10px;padding:1px 0}
@@ -826,4 +904,37 @@ html, body {
   .tcd-effect{font-size:10px}
   .tcd-flavor{font-size:10px}
   .tcd-kw{font-size:7px;width:16px;height:16px}
+}
+
+/* ============ 超宽屏居中（21:9、32:9 折叠屏展开）============
+   屏幕过宽时避免 UI 拉伸过度，主区域限制最大宽度并居中。
+   顶栏与手牌行仍铺满以保持视觉连贯。 */
+@media screen and (min-aspect-ratio: 21/9) {
+  .main-area{
+    max-width: 1200px;
+    margin-left: auto;
+    margin-right: auto;
+    width: 100%;
+  }
+}
+
+/* ============ 触摸设备：放大点击目标 ============
+   Android WebView 中 pointer:coarse 准确识别触摸设备，
+   避免按钮过小导致误触。 */
+@media (pointer: coarse) {
+  .ctrl-btn{ /* 按钮最小尺寸 44x44（Material 推荐触摸目标） */
+    min-width:44px; min-height:44px;
+  }
+  .card{cursor:default} /* 触摸设备无 hover 光标 */
+}
+
+/* ============ Android WebView 兼容性微调 ============ */
+/* 1. 防止 WebView 文字自动调整字体大小 */
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+/* 2. 防止 WebView 长按选择文本（已在 body 设置 user-select:none，此处兜底） */
+* { -webkit-touch-callout: none; }
+/* 3. 滚动容器开启惯性滚动 */
+.tavern-cards, .hand-zone, .board-zone, .combat-log {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
 }

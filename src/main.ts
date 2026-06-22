@@ -1,5 +1,6 @@
 // 山海战棋 · 入口
 import './styles/main.css';
+import { setupScreenDebug } from './screen-debug';
 import {
   createGame,
   buyMinion,
@@ -23,6 +24,9 @@ import { GameUI, renderHeroSelect } from './ui/render';
 import { CARD_MAP, HEROES } from './game/cards';
 import type { CardDef } from './game/types';
 import * as sfx from './game/audio';
+
+// 启动屏幕适配调试浮层（仅 #debug 或 localStorage 开启时显示）
+setupScreenDebug();
 
 let state: ReturnType<typeof createGame>;
 let ui: GameUI;
