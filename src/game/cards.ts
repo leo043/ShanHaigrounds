@@ -250,7 +250,6 @@ export const CARDS: CardDef[] = [
     attack: 3,
     health: 3,
     keywords: ['reborn'],
-    effects: [{ trigger: 'deathrattle', target: 'randomAlly', divineShield: true }],
     flavor: '九天降世，赐盾众生。',
   },
 

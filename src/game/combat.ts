@@ -328,7 +328,6 @@ function cleanupDead(
         snap: makeSnapFromArr(finalBoard),
         text: `【${m.name}】复生！以 1 点生命重返战场`,
       })
-      continue
     }
 
     // 触发亡语
