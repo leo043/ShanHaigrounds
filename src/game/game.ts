@@ -308,6 +308,7 @@ export function generateTripleReward(player: PlayerState): CardDef[] {
 export function applyTripleReward(player: PlayerState, def: CardDef): void {
   if (player.hand.length >= 10) return;
   player.hand.push(createMinion(def));
+  checkTriple(player);
 }
 
 function removeFromPlayer(player: PlayerState, uid: string): void {
