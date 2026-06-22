@@ -514,11 +514,44 @@ export class GameUI {
         </div>
         <div class="combat-side combat-player">
           <div class="row-label">我阵</div>
-          <div class="board-zone" id="board-player">${pHtml || '<span class="empty-hint">空</span>'}</div>
+          <div class="board-zone" id="player-board">${pHtml || '<span class="empty-hint">空</span>'}</div>
         </div>
         <div class="combat-log visible" id="combat-log">${logHtml}</div>
       </div>
     `;
+  }
+
+  /** 轻量更新：只更新日志和标题，不重建棋盘 DOM */
+  updateCombatLogAndTitle(logHtml: string, title: string, sub: string): void {
+    const logEl = this.root.querySelector('#combat-log');
+    if (logEl) logEl.innerHTML = logHtml;
+    const titleEl = this.root.querySelector('.message-title');
+    if (titleEl) titleEl.textContent = title;
+    const subEl = this.root.querySelector('.message-sub');
+    if (subEl) subEl.textContent = sub;
+  }
+
+  /** 轻量更新：根据快照原地更新 HP / 攻击力 / 圣盾状态，不重建 DOM */
+  updateCombatHp(pBoard: Minion[], eBoard: Minion[]): void {
+    const updateSide = (board: Minion[], zoneSelector: string) => {
+      const zone = this.root.querySelector(zoneSelector);
+      if (!zone) return;
+      for (const m of board) {
+        const el = zone.querySelector(`[data-uid="${m.uid}"]`) as HTMLElement | null;
+        if (!el) continue;
+        const hpEl = el.querySelector('.card-hp');
+        if (hpEl) {
+          const val = Math.max(0, m.health);
+          hpEl.textContent = String(val);
+          hpEl.classList.toggle('damaged', m.health < m.maxHealth);
+        }
+        const atkEl = el.querySelector('.card-atk');
+        if (atkEl) atkEl.textContent = String(m.attack);
+        el.classList.toggle('has-shield', m.divineShield);
+      }
+    };
+    updateSide(pBoard, '#player-board');
+    updateSide(eBoard, '#board-enemy');
   }
 
   renderGameOver(): void {

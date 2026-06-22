@@ -273,23 +273,12 @@ function cleanupDead(
   const dead = board.filter((m) => m.health <= 0);
   if (dead.length === 0) return board;
 
-  // 死亡 step 的快照：移除所有死亡随从后的状态
-  const aliveAfterDeath = board.filter((m) => m.health > 0);
   const makeSnapFromArr = (arr: Minion[]): { p: Minion[]; e: Minion[] } =>
     side === 'player'
       ? { p: cloneBoard(arr), e: cloneBoard(enemyBoard) }
       : { p: cloneBoard(enemyBoard), e: cloneBoard(arr) };
 
-  steps.push({
-    type: 'death',
-    killedSide: side,
-    killedUids: dead.map((m) => m.uid),
-    snap: makeSnapFromArr(aliveAfterDeath),
-    text: `${side === 'player' ? '我方' : '敌方'}阵亡：${dead.map((m) => m.name).join('、')}`,
-  });
-
-  // 按原 board 顺序重建：存活直接保留，死亡的在原位置触发复生/亡语召唤
-  // 这样复生体和召唤物出现在原死亡随从的位置
+  // 先按原 board 顺序重建：存活直接保留，死亡的在原位置触发复生/亡语召唤
   const finalBoard: Minion[] = [];
 
   for (const m of board) {
@@ -382,6 +371,15 @@ function cleanupDead(
     }
     // 无复生无召唤：随从消失，不加入 finalBoard
   }
+
+  // 用 finalBoard（含复生/召唤物）作为死亡步快照，避免渲染空白期
+  steps.push({
+    type: 'death',
+    killedSide: side,
+    killedUids: dead.map((m) => m.uid),
+    snap: makeSnapFromArr(finalBoard),
+    text: `${side === 'player' ? '我方' : '敌方'}阵亡：${dead.map((m) => m.name).join('、')}`,
+  });
 
   return finalBoard;
 }

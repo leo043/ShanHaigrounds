@@ -259,6 +259,10 @@ async function playCombatAnimation(result: CombatResult): Promise<void> {
   ui.renderCombatStatic(state.player.board, state.enemy.board, '', '两军交锋', '战鼓擂动，胜负将分……');
   await delay(500);
 
+  // 判断是否需要全量重建棋盘
+  const needsFullRender = (type: CombatStep['type']) =>
+    type === 'death' || type === 'reborn' || type === 'summon';
+
   for (const step of result.steps) {
     // 追加日志
     logHtml += `<div class="log-entry ${logClass(step.type)}">${step.text}</div>`;
@@ -301,11 +305,16 @@ async function playCombatAnimation(result: CombatResult): Promise<void> {
       await delay(140);
     }
 
-    // 再渲染本步快照（反映新血量/移除死亡/新增召唤/复生）
-    const summonedUid = step.type === 'summon' ? step.summonedUid : step.type === 'reborn' ? step.rebornUid : undefined;
+    // 渲染：棋盘结构不变时只更新 HP，变化时全量重建
     const title = titleFor(step, result);
     const sub = subFor(step);
-    ui.renderCombatStatic(step.snap.p, step.snap.e, logHtml, title, sub, summonedUid);
+    if (needsFullRender(step.type)) {
+      const summonedUid = step.type === 'summon' ? step.summonedUid : step.type === 'reborn' ? step.rebornUid : undefined;
+      ui.renderCombatStatic(step.snap.p, step.snap.e, logHtml, title, sub, summonedUid);
+    } else {
+      ui.updateCombatHp(step.snap.p, step.snap.e);
+      ui.updateCombatLogAndTitle(logHtml, title, sub);
+    }
     scrollLog();
   }
 
