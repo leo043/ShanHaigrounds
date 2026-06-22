@@ -21,10 +21,15 @@ export interface UIHooks {
   onRestart: () => void
   onTripleRewardPick: (defId: string) => void
   onHeroPick: (heroId: string) => void
+  onSurrender: () => void
 }
 
 /** 渲染开局英雄选择面板（独立函数，不依赖 GameUI 实例） */
-export function renderHeroSelect(root: HTMLElement, onPick: (heroId: string) => void): void {
+export function renderHeroSelect(
+  root: HTMLElement,
+  onPick: (heroId: string) => void,
+  onBack: () => void,
+): void {
   const cardsHtml = HEROES.map((h) => {
     const imgSrc = HERO_IMAGES[h.id] ?? ''
     const portraitHtml = imgSrc
@@ -48,6 +53,7 @@ export function renderHeroSelect(root: HTMLElement, onPick: (heroId: string) => 
   root.innerHTML = `
     <div class="hero-select-overlay">
       <div class="hero-select-banner">
+        <div class="codex-back" id="hero-back" style="position:absolute;top:16px;left:20px;font-size:28px;cursor:pointer;color:var(--gold-light);z-index:10">←</div>
         <h1 class="hero-select-h1">择主而战</h1>
         <div class="hero-select-sub">选择你的英雄 · 五神各异 · 技能定调</div>
       </div>
@@ -61,6 +67,7 @@ export function renderHeroSelect(root: HTMLElement, onPick: (heroId: string) => 
       if (id) onPick(id)
     })
   })
+  root.querySelector('#hero-back')?.addEventListener('click', onBack)
 }
 
 /** 渲染主菜单 */
@@ -379,6 +386,7 @@ export class GameUI {
         </button>
         <div class="gold-display"><span class="gold-coin"></span>${s.player.gold}/${s.player.maxGold}</div>
         <div class="spacer"></div>
+        <button class="ctrl-btn ctrl-surrender" id="btn-surrender" title="投降"><span class="ctrl-icon">⚑</span></button>
         <button class="ctrl-btn ctrl-mute" id="btn-mute" title="${isMuted() ? '取消静音' : '静音'}">
           <span class="ctrl-icon">${isMuted() ? '🔇' : '🔊'}</span>
         </button>
@@ -444,6 +452,9 @@ export class GameUI {
     root.querySelector('#btn-freeze')?.addEventListener('click', () => this.hooks.onFreeze())
     root.querySelector('#btn-upgrade')?.addEventListener('click', () => this.hooks.onUpgrade())
     root.querySelector('#btn-sell')?.addEventListener('click', () => this.hooks.onSell())
+    root.querySelector('#btn-surrender')?.addEventListener('click', () => {
+      if (confirm('确定要投降吗？')) this.hooks.onSurrender()
+    })
     root.querySelector('#btn-combat')?.addEventListener('click', () => this.hooks.onCombat())
     root.querySelector('#btn-mute')?.addEventListener('click', () => {
       toggleMute()

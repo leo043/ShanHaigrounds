@@ -104,6 +104,7 @@ class GameController {
       onRestart: () => this.onRestart(),
       onTripleRewardPick: (defId) => this.onTripleRewardPick(defId),
       onHeroPick: () => {},
+      onSurrender: () => this.onSurrender(),
     })
     this.ui.renderRecruit()
   }
@@ -391,6 +392,10 @@ class GameController {
   private onRestart(): void {
     showMainMenu()
   }
+
+  private onSurrender(): void {
+    showMainMenu()
+  }
 }
 
 // ============ 启动入口 ============
@@ -407,9 +412,13 @@ function showMainMenu(): void {
 }
 
 function showHeroSelect(): void {
-  renderHeroSelect(appRoot, (heroId) => {
-    new GameController(heroId, appRoot)
-  })
+  renderHeroSelect(
+    appRoot,
+    (heroId) => {
+      new GameController(heroId, appRoot)
+    },
+    () => showMainMenu(),
+  )
 }
 
 function showCodex(): void {
