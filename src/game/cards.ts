@@ -218,7 +218,7 @@ export const CARDS: CardDef[] = [
     attack: 3,
     health: 3,
     effects: [
-      { trigger: 'battlecry', target: 'damageRandomEnemy', damage: 2 },
+      { trigger: 'combatStart', target: 'damageRandomEnemy', damage: 2 },
     ],
     flavor: '雷霆万钧，邪祟辟易。',
   },
@@ -323,7 +323,7 @@ export const CARDS: CardDef[] = [
     attack: 3,
     health: 4,
     effects: [
-      { trigger: 'battlecry', target: 'damageRandomEnemy', damage: 2 },
+      { trigger: 'combatStart', target: 'damageRandomEnemy', damage: 2 },
     ],
     flavor: '百目千足，毒雾弥漫。',
   },
@@ -408,6 +408,7 @@ export const HEROES: Hero[] = [
     health: 40,
     armor: 5,
     power: 'armorStart',
+    powerName: '玄甲',
     powerDesc: '开局额外获得 5 点护甲',
   },
   {
@@ -417,6 +418,7 @@ export const HEROES: Hero[] = [
     health: 35,
     armor: 0,
     power: 'saveOnce',
+    powerName: '浴火',
     powerDesc: '每局首次战败少受 5 点伤害',
   },
   {
@@ -426,6 +428,7 @@ export const HEROES: Hero[] = [
     health: 40,
     armor: 0,
     power: 'freeRefreshOnce',
+    powerName: '虎啸',
     powerDesc: '每回合首次刷新酒馆免费',
   },
   {
@@ -435,6 +438,7 @@ export const HEROES: Hero[] = [
     health: 38,
     armor: 0,
     power: 'goldPlusOne',
+    powerName: '东来',
     powerDesc: '每回合开始额外获得 1 金',
   },
   {
@@ -444,6 +448,7 @@ export const HEROES: Hero[] = [
     health: 38,
     armor: 2,
     power: 'startTier2',
+    powerName: '赐福',
     powerDesc: '开局酒馆直接 2 级（节省升级费）',
   },
 ];
@@ -478,6 +483,7 @@ export const TRIGGER_NAMES: Record<string, string> = {
   endOfTurn: '回合结束',
   startOfTurn: '回合开始',
   onSummon: '召唤',
+  combatStart: '战斗开始',
 };
 
 /** 目标中文名 */

@@ -323,14 +323,15 @@ function removeFromPlayer(player: PlayerState, uid: string): void {
 
 /** 刷新酒馆（白虎英雄每回合首次免费） */
 export function refreshTavern(player: PlayerState): boolean {
-  // 白虎技能：每回合首次免费
   if (player.hero.power === 'freeRefreshOnce' && !player.hero.freeRefreshUsed) {
     player.hero.freeRefreshUsed = true;
+    player.frozen = false;
     rollTavern(player);
     return true;
   }
   if (player.gold < 1) return false;
   player.gold -= 1;
+  player.frozen = false;
   rollTavern(player);
   return true;
 }

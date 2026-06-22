@@ -57,6 +57,40 @@ export function simulateCombat(state: GameState): CombatResult {
     text: `战斗开始！我方 ${pBoard.length} 子 vs 敌方 ${eBoard.length} 子，${turn === 'player' ? '我方' : '敌方'}先手`,
   });
 
+  // 处理战斗开始时的效果
+  for (const side of ['player', 'enemy'] as const) {
+    const board = side === 'player' ? pBoard : eBoard;
+    const enemy = side === 'player' ? eBoard : pBoard;
+    for (const m of board) {
+      for (const e of m.effects) {
+        if (e.trigger !== 'combatStart') continue;
+        if (e.target === 'damageRandomEnemy' && e.damage && enemy.length > 0) {
+          const t = enemy[Math.floor(Math.random() * enemy.length)];
+          if (t.divineShield) {
+            t.divineShield = false;
+            steps.push({
+              type: 'shield',
+              side: side === 'player' ? 'enemy' : 'player',
+              defenderUid: t.uid,
+              snap: snap(),
+              text: `【${m.name}】战斗开始伤害被【${t.name}】圣盾抵挡`,
+            });
+          } else {
+            damageMinion(t, e.damage);
+            steps.push({
+              type: 'hit',
+              side,
+              defenderUid: t.uid,
+              damage: e.damage,
+              snap: snap(),
+              text: `【${m.name}】战斗开始对【${t.name}】造成 ${e.damage} 点伤害`,
+            });
+          }
+        }
+      }
+    }
+  }
+
   let pPtr = 0;
   let ePtr = 0;
   let guard = 0;

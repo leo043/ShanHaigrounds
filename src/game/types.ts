@@ -12,7 +12,8 @@ export type TriggerType =
   | 'deathrattle' // 亡语：死亡时
   | 'endOfTurn' // 回合结束
   | 'startOfTurn' // 回合开始
-  | 'onSummon'; // 召唤时（被召唤/打出时触发）
+  | 'onSummon' // 召唤时（被召唤/打出时触发）
+  | 'combatStart'; // 战斗开始时
 
 /** 效果目标 */
 export type EffectTarget =
@@ -86,6 +87,7 @@ export interface Hero {
   health: number;
   armor: number;
   power: HeroPower;
+  powerName: string; // 技能名称
   powerDesc: string; // 技能描述（UI 显示）
   // 运行时状态（不计入英雄定义对比）
   saveUsed?: boolean;        // 朱雀保命是否已用

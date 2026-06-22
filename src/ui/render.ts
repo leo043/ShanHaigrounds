@@ -108,7 +108,6 @@ function cardDetailHtml(def: CardDef, golden: boolean, curHp: number, maxHp: num
         <div class="tcd-stars">${stars}</div>
         <div class="tcd-tribe">${tribeChar}</div>
         ${imgHtml}
-        <div class="tcd-card-name">${def.name}</div>
         <div class="tcd-atk-big">${def.attack}</div>
         <div class="tcd-hp-big ${hpClass}">${Math.max(0, curHp)}</div>
       </div>
@@ -139,7 +138,7 @@ export function minionHtml(
 
   const imgSrc = MINION_IMAGES[m.defId] ?? '';
   const imgHtml = imgSrc
-    ? `<img class="card-img" src="${imgSrc}" alt="${m.name}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="card-art-fallback" style="display:none">${m.name.charAt(0)}</div>`
+    ? `<img class="card-img" src="${imgSrc}" alt="${m.name}" onerror="this.style.display='none'">`
     : `<div class="card-art">${m.name.charAt(0)}</div>`;
 
   const cls = [
@@ -183,8 +182,8 @@ function heroHtml(p: PlayerState, isEnemy: boolean): string {
   const h = p.hero;
   const imgSrc = HERO_IMAGES[h.id] ?? '';
   const portraitHtml = imgSrc
-    ? `<img class="hero-img" src="${imgSrc}" alt="${h.name}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span class="hero-portrait-fallback">${h.name.charAt(0)}</span>`
-    : `<span class="hero-portrait-fallback">${h.name.charAt(0)}</span>`;
+    ? `<img class="hero-img" src="${imgSrc}" alt="${h.name}" onerror="this.style.display='none'">`
+    : ``;
 
   return `<div class="hero-bar">
     <div class="hero-portrait">${portraitHtml}</div>
@@ -218,8 +217,8 @@ export function renderHeroSelect(root: HTMLElement, onPick: (heroId: string) => 
   const cardsHtml = HEROES.map((h) => {
     const imgSrc = HERO_IMAGES[h.id] ?? '';
     const portraitHtml = imgSrc
-      ? `<img class="hero-select-img" src="${imgSrc}" alt="${h.name}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span class="hero-select-fallback">${h.name.charAt(0)}</span>`
-      : `<span class="hero-select-fallback" style="display:flex">${h.name.charAt(0)}</span>`;
+      ? `<img class="hero-select-img" src="${imgSrc}" alt="${h.name}" onerror="this.style.display='none'">`
+      : ``;
     return `<div class="hero-select-card" data-hero-id="${h.id}">
       <div class="hero-select-portrait">${portraitHtml}</div>
       <div class="hero-select-name">${h.name}</div>
@@ -229,7 +228,7 @@ export function renderHeroSelect(root: HTMLElement, onPick: (heroId: string) => 
         ${h.armor > 0 ? `<span class="hs-armor">🛡 ${h.armor}</span>` : ''}
       </div>
       <div class="hero-select-power">
-        <div class="hs-power-label">技能</div>
+        <div class="hs-power-label">${h.powerName}</div>
         <div class="hs-power-desc">${h.powerDesc}</div>
       </div>
     </div>`;
@@ -373,7 +372,9 @@ export class GameUI {
       : '';
 
     const canUpgrade = s.player.tavernTier < 6 && s.player.gold >= s.player.upgradeCost;
-    const canRefresh = s.player.gold >= 1;
+    const hasFreeRefresh = s.player.hero.power === 'freeRefreshOnce' && !s.player.hero.freeRefreshUsed;
+    const canRefresh = hasFreeRefresh || s.player.gold >= 1;
+    const refreshCost = hasFreeRefresh ? 0 : 1;
     const canSell = this.selection?.type === 'board';
 
     const hint =
@@ -399,7 +400,7 @@ export class GameUI {
         </button>
         <button class="ctrl-btn ctrl-refresh" id="btn-refresh" ${canRefresh ? '' : 'disabled'} title="刷新酒馆">
           <span class="ctrl-icon">↻</span>
-          <span class="ctrl-cost">1</span>
+          <span class="ctrl-cost">${refreshCost}</span>
         </button>
         <button class="ctrl-btn ctrl-freeze ${s.player.frozen ? 'active' : ''}" id="btn-freeze" title="${s.player.frozen ? '已冻结' : '冻结酒馆'}">
           <span class="ctrl-icon">❄</span>
