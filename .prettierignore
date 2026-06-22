@@ -1,0 +1,8 @@
+dist/
+node_modules/
+android/
+.workbuddy/
+coverage/
+*.min.js
+*.min.css
+package-lock.json

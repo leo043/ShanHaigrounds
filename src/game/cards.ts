@@ -1,6 +1,6 @@
 // 国风卡牌数据 - 山海战棋
 // 主题：东方神话，三族（人/妖/仙）
-import type { CardDef, Hero, Effect, Keyword } from './types';
+import type { CardDef, Hero, Effect, Keyword } from './types'
 
 export const CARDS: CardDef[] = [
   // ============ 人族 · 侠客武将 ============
@@ -41,9 +41,7 @@ export const CARDS: CardDef[] = [
     tier: 2,
     attack: 2,
     health: 3,
-    effects: [
-      { trigger: 'endOfTurn', target: 'self', buffAttack: 1, buffHealth: 1 },
-    ],
+    effects: [{ trigger: 'endOfTurn', target: 'self', buffAttack: 1, buffHealth: 1 }],
     flavor: '一禅一棍，日进寸功。',
   },
   {
@@ -53,9 +51,7 @@ export const CARDS: CardDef[] = [
     tier: 3,
     attack: 4,
     health: 3,
-    effects: [
-      { trigger: 'battlecry', target: 'adjacent', buffAttack: 1, buffHealth: 1 },
-    ],
+    effects: [{ trigger: 'battlecry', target: 'adjacent', buffAttack: 1, buffHealth: 1 }],
     flavor: '三军司命，号令如山。',
   },
   {
@@ -65,9 +61,7 @@ export const CARDS: CardDef[] = [
     tier: 3,
     attack: 2,
     health: 4,
-    effects: [
-      { trigger: 'endOfTurn', target: 'allAllies', buffAttack: 1 },
-    ],
+    effects: [{ trigger: 'endOfTurn', target: 'allAllies', buffAttack: 1 }],
     flavor: '运筹帷幄，决胜千里。',
   },
   {
@@ -205,9 +199,7 @@ export const CARDS: CardDef[] = [
     tier: 2,
     attack: 1,
     health: 5,
-    effects: [
-      { trigger: 'endOfTurn', target: 'adjacent', buffAttack: 1, buffHealth: 1 },
-    ],
+    effects: [{ trigger: 'endOfTurn', target: 'adjacent', buffAttack: 1, buffHealth: 1 }],
     flavor: '鹤鸣九皋，声闻于天，泽被同侪。',
   },
   {
@@ -217,9 +209,7 @@ export const CARDS: CardDef[] = [
     tier: 3,
     attack: 3,
     health: 3,
-    effects: [
-      { trigger: 'combatStart', target: 'damageRandomEnemy', damage: 2 },
-    ],
+    effects: [{ trigger: 'combatStart', target: 'damageRandomEnemy', damage: 2 }],
     flavor: '雷霆万钧，邪祟辟易。',
   },
   {
@@ -229,9 +219,7 @@ export const CARDS: CardDef[] = [
     tier: 4,
     attack: 5,
     health: 4,
-    effects: [
-      { trigger: 'startOfTurn', target: 'self', buffAttack: 1, buffHealth: 1 },
-    ],
+    effects: [{ trigger: 'startOfTurn', target: 'self', buffAttack: 1, buffHealth: 1 }],
     flavor: '三眼洞明，斩妖除魔。',
   },
   {
@@ -251,9 +239,7 @@ export const CARDS: CardDef[] = [
     tier: 5,
     attack: 7,
     health: 7,
-    effects: [
-      { trigger: 'endOfTurn', target: 'allAllies', buffAttack: 1, buffHealth: 1 },
-    ],
+    effects: [{ trigger: 'endOfTurn', target: 'allAllies', buffAttack: 1, buffHealth: 1 }],
     flavor: '道生万物，德被苍生。',
   },
   {
@@ -264,9 +250,7 @@ export const CARDS: CardDef[] = [
     attack: 3,
     health: 3,
     keywords: ['reborn'],
-    effects: [
-      { trigger: 'battlecry', target: 'allAllies', divineShield: true },
-    ],
+    effects: [{ trigger: 'battlecry', target: 'allAllies', divineShield: true }],
     flavor: '九天降世，赐盾众生。',
   },
 
@@ -322,9 +306,7 @@ export const CARDS: CardDef[] = [
     tier: 3,
     attack: 3,
     health: 4,
-    effects: [
-      { trigger: 'combatStart', target: 'damageRandomEnemy', damage: 2 },
-    ],
+    effects: [{ trigger: 'combatStart', target: 'damageRandomEnemy', damage: 2 }],
     flavor: '百目千足，毒雾弥漫。',
   },
   {
@@ -363,9 +345,7 @@ export const CARDS: CardDef[] = [
     tier: 1,
     attack: 1,
     health: 2,
-    effects: [
-      { trigger: 'battlecry', target: 'self', buffAttack: 1, buffHealth: 1 },
-    ],
+    effects: [{ trigger: 'battlecry', target: 'self', buffAttack: 1, buffHealth: 1 }],
     flavor: '广寒捣药，灵性十足。',
   },
   {
@@ -375,9 +355,7 @@ export const CARDS: CardDef[] = [
     tier: 2,
     attack: 2,
     health: 2,
-    effects: [
-      { trigger: 'battlecry', target: 'adjacent', buffAttack: 1, buffHealth: 1 },
-    ],
+    effects: [{ trigger: 'battlecry', target: 'adjacent', buffAttack: 1, buffHealth: 1 }],
     flavor: '步步生莲，泽被相邻。',
   },
   {
@@ -387,17 +365,13 @@ export const CARDS: CardDef[] = [
     tier: 4,
     attack: 4,
     health: 5,
-    effects: [
-      { trigger: 'battlecry', target: 'allAllies', buffHealth: 1 },
-    ],
+    effects: [{ trigger: 'battlecry', target: 'allAllies', buffHealth: 1 }],
     flavor: '寿同南山，福泽众生。',
   },
-];
+]
 
 /** 按 id 索引 */
-export const CARD_MAP: Record<string, CardDef> = Object.fromEntries(
-  CARDS.map((c) => [c.id, c]),
-);
+export const CARD_MAP: Record<string, CardDef> = Object.fromEntries(CARDS.map((c) => [c.id, c]))
 
 /** 英雄定义 */
 export const HEROES: Hero[] = [
@@ -451,12 +425,15 @@ export const HEROES: Hero[] = [
     powerName: '赐福',
     powerDesc: '开局酒馆直接 2 级（节省升级费）',
   },
-];
+]
 
 /** 衍生物（亡语/战吼召唤的）转为 CardDef-like 用于实例化 */
-export function getSummonDef(
-  summon: { name: string; attack: number; health: number; tribe: 'human' | 'demon' | 'spirit' },
-): CardDef {
+export function getSummonDef(summon: {
+  name: string
+  attack: number
+  health: number
+  tribe: 'human' | 'demon' | 'spirit'
+}): CardDef {
   return {
     id: `summon_${summon.name}`,
     name: summon.name,
@@ -464,7 +441,7 @@ export function getSummonDef(
     tier: 1,
     attack: summon.attack,
     health: summon.health,
-  };
+  }
 }
 
 /** 关键词中文名 */
@@ -474,7 +451,7 @@ export const KEYWORD_NAMES: Record<Keyword, string> = {
   poison: '剧毒',
   windfury: '风怒',
   reborn: '复生',
-};
+}
 
 /** 触发时机中文名 */
 export const TRIGGER_NAMES: Record<string, string> = {
@@ -484,7 +461,7 @@ export const TRIGGER_NAMES: Record<string, string> = {
   startOfTurn: '回合开始',
   onSummon: '召唤',
   combatStart: '战斗开始',
-};
+}
 
 /** 目标中文名 */
 export const TARGET_NAMES: Record<string, string> = {
@@ -495,48 +472,48 @@ export const TARGET_NAMES: Record<string, string> = {
   summonMinion: '召唤',
   damageRandomEnemy: '随机敌方随从',
   none: '无',
-};
+}
 
 /** 生成效果的可读描述 */
 export function describeEffect(e: Effect): string {
-  const trigger = TRIGGER_NAMES[e.trigger] ?? e.trigger;
-  const target = TARGET_NAMES[e.target] ?? e.target;
-  const parts: string[] = [];
-  if (e.buffAttack && e.buffHealth) parts.push(`+${e.buffAttack}/+${e.buffHealth}`);
-  else if (e.buffAttack) parts.push(`+${e.buffAttack} 攻击`);
-  else if (e.buffHealth) parts.push(`+${e.buffHealth} 生命`);
-  if (e.summon) parts.push(`召唤 ${e.summon.name}(${e.summon.attack}/${e.summon.health})`);
-  if (e.damage) parts.push(`造成 ${e.damage} 点伤害`);
-  if (e.divineShield) parts.push('赋予圣盾');
-  const action = parts.length > 0 ? parts.join('，') : '';
+  const trigger = TRIGGER_NAMES[e.trigger] ?? e.trigger
+  const target = TARGET_NAMES[e.target] ?? e.target
+  const parts: string[] = []
+  if (e.buffAttack && e.buffHealth) parts.push(`+${e.buffAttack}/+${e.buffHealth}`)
+  else if (e.buffAttack) parts.push(`+${e.buffAttack} 攻击`)
+  else if (e.buffHealth) parts.push(`+${e.buffHealth} 生命`)
+  if (e.summon) parts.push(`召唤 ${e.summon.name}(${e.summon.attack}/${e.summon.health})`)
+  if (e.damage) parts.push(`造成 ${e.damage} 点伤害`)
+  if (e.divineShield) parts.push('赋予圣盾')
+  const action = parts.length > 0 ? parts.join('，') : ''
   if (e.target === 'summonMinion' && e.summon) {
-    return `${trigger}：召唤 ${e.summon.name}(${e.summon.attack}/${e.summon.health})`;
+    return `${trigger}：召唤 ${e.summon.name}(${e.summon.attack}/${e.summon.health})`
   }
   if (e.target === 'damageRandomEnemy' && e.damage) {
-    return `${trigger}：对随机敌方随从造成 ${e.damage} 点伤害`;
+    return `${trigger}：对随机敌方随从造成 ${e.damage} 点伤害`
   }
-  return `${trigger}：使${target}${action}`;
+  return `${trigger}：使${target}${action}`
 }
 
 /** 生成卡牌的完整效果描述（多行） */
 export function describeCard(def: CardDef): string[] {
-  const lines: string[] = [];
+  const lines: string[] = []
   // 关键词
   if (def.keywords && def.keywords.length > 0) {
     for (const k of def.keywords) {
-      lines.push(`【${KEYWORD_NAMES[k]}】${KEYWORD_DESC[k]}`);
+      lines.push(`【${KEYWORD_NAMES[k]}】${KEYWORD_DESC[k]}`)
     }
   }
   // 效果
   if (def.effects) {
     for (const e of def.effects) {
-      lines.push(describeEffect(e));
+      lines.push(describeEffect(e))
     }
   }
   if (lines.length === 0) {
-    lines.push('（无特殊效果）');
+    lines.push('（无特殊效果）')
   }
-  return lines;
+  return lines
 }
 
 /** 关键词说明 */
@@ -546,4 +523,4 @@ export const KEYWORD_DESC: Record<Keyword, string> = {
   poison: '攻击击杀敌方随从',
   windfury: '每回合可攻击两次',
   reborn: '死亡后以 1 点生命复活',
-};
+}

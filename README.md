@@ -52,6 +52,61 @@ npm run dev
 
 ---
 
+## 开发指南
+
+### 可用脚本
+
+```bash
+npm run dev          # 启动开发服务器
+npm run build        # 类型检查 + 生产构建
+npm run lint         # 检查代码规范（ESLint）
+npm run lint:fix     # 自动修复可修复的 lint 问题
+npm run format       # Prettier 格式化所有源文件
+npm run format:check # 检查格式是否符合规范（不修改）
+npm run typecheck    # 仅 TypeScript 类型检查（不构建）
+npm run test         # 运行单元测试（Vitest）
+npm run test:watch   # 测试监听模式（开发时用）
+```
+
+### 代码质量护栏
+
+项目已配置三层自动化护栏，保障代码质量：
+
+1. **ESLint + Prettier** — 统一代码风格，捕获常见错误
+2. **TypeScript 严格模式** — `strict: true` + `noUnusedLocals/Parameters`
+3. **Vitest 单元测试** — 核心战斗逻辑有 14 个测试覆盖
+
+### Git 提交规范
+
+提交前会自动触发 Husky hooks：
+
+- **pre-commit**：对暂存文件运行 ESLint + Prettier（lint-staged）
+- **commit-msg**：校验提交信息格式（Conventional Commits）
+
+提交信息格式：
+
+```
+<type>(<scope>): <subject>
+
+# 示例
+fix(combat): 修复金卡关键词死代码
+feat(cards): 新增哪吒卡牌
+docs(readme): 补充开发指南
+refactor(game): 用 Effect 类型替代 any
+test(combat): 补充圣盾与剧毒测试
+chore: 升级依赖
+```
+
+常用 type：`feat` / `fix` / `docs` / `refactor` / `test` / `chore` / `perf` / `style`
+
+### 测试约定
+
+- 测试文件放在源文件旁：`src/game/combat.test.ts`
+- 命名：`<模块名>.test.ts`
+- 战斗测试用 `vi.spyOn(Math, 'random')` mock 随机性，确保确定性
+
+---
+
 ## 游戏玩法
 
 ### 基础流程
@@ -64,13 +119,13 @@ npm run dev
 
 ### 核心机制
 
-| 机制 | 说明 |
-|------|------|
-| **金币系统** | 每回合获得递增的金币，用于招募和升级 |
-| **酒馆升级** | 提升酒馆等级，解锁更强大的随从 |
-| **三连合成** | 三个相同随从合成金色版本，获得强力奖励 |
+| 机制         | 说明                                               |
+| ------------ | -------------------------------------------------- |
+| **金币系统** | 每回合获得递增的金币，用于招募和升级               |
+| **酒馆升级** | 提升酒馆等级，解锁更强大的随从                     |
+| **三连合成** | 三个相同随从合成金色版本，获得强力奖励             |
 | **随从种族** | 人族（蓝色）、妖族（紫色）、仙族（金色），各具特色 |
-| **关键词** | 嘲讽、圣盾、剧毒、风怒、复生、战吼、亡语 |
+| **关键词**   | 嘲讽、圣盾、剧毒、风怒、复生、战吼、亡语           |
 
 ---
 

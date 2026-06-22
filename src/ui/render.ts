@@ -1,15 +1,11 @@
 // UI 渲染与交互 - 对齐官方酒馆战棋布局
-import type { GameState, Minion, PlayerState, CardDef, Hero } from '../game/types';
-import type { CombatResult } from '../game/combat';
-import { describeCard, KEYWORD_NAMES, CARD_MAP, HEROES } from '../game/cards';
-import { toggleMute, isMuted } from '../game/audio';
+import type { GameState, Minion, PlayerState, CardDef } from '../game/types'
+import { describeCard, KEYWORD_NAMES, CARD_MAP, HEROES } from '../game/cards'
+import { toggleMute, isMuted } from '../game/audio'
 
-export type Selection =
-  | { type: 'hand'; uid: string }
-  | { type: 'board'; uid: string }
-  | null;
+export type Selection = { type: 'hand'; uid: string } | { type: 'board'; uid: string } | null
 
-const TRIBE_CHAR: Record<string, string> = { human: '人', demon: '妖', spirit: '仙' };
+const TRIBE_CHAR: Record<string, string> = { human: '人', demon: '妖', spirit: '仙' }
 
 /** 卡牌图片路径映射 (defId → 图片相对路径) */
 export const MINION_IMAGES: Record<string, string> = {
@@ -52,7 +48,7 @@ export const MINION_IMAGES: Record<string, string> = {
   summon_蛛仔: '/images/minions/summon_spider.png',
   summon_腐尸: '/images/minions/summon_zombie.png',
   summon_蛮牛: '/images/minions/summon_bull.png',
-};
+}
 
 /** 英雄头像映射 */
 export const HERO_IMAGES: Record<string, string> = {
@@ -61,46 +57,62 @@ export const HERO_IMAGES: Record<string, string> = {
   hero_baihu: '/images/heroes/hero_baihu.png',
   hero_qinglong: '/images/heroes/hero_qinglong.png',
   hero_qilin: '/images/heroes/hero_qilin.png',
-};
+}
 
 /** 生成随从卡牌的 tooltip HTML（鼠标悬停详情 - 大图+侧边效果） */
 export function minionTooltipHtml(m: Minion): string {
   const def: CardDef = {
-    id: m.defId, name: m.name, tribe: m.tribe, tier: m.tier,
-    attack: m.attack, health: m.health,
-    keywords: m.keywords, effects: m.effects,
+    id: m.defId,
+    name: m.name,
+    tribe: m.tribe,
+    tier: m.tier,
+    attack: m.attack,
+    health: m.health,
+    keywords: m.keywords,
+    effects: m.effects,
     flavor: CARD_MAP[m.defId]?.flavor ?? '',
-  };
-  return cardDetailHtml(def, m.golden, m.health, m.maxHealth);
+  }
+  return cardDetailHtml(def, m.golden, m.health, m.maxHealth)
 }
 
 /** 为静态卡牌定义生成 tooltip */
 export function cardDefTooltipHtml(def: CardDef): string {
-  return cardDetailHtml(def, false, def.health, def.health);
+  return cardDetailHtml(def, false, def.health, def.health)
 }
 
 /** 生成卡牌详情面板 HTML：左侧大图卡 + 右侧效果说明 */
 function cardDetailHtml(def: CardDef, golden: boolean, curHp: number, maxHp: number): string {
-  const lines = describeCard(def);
-  const imgSrc = MINION_IMAGES[def.id] ?? '';
-  const tribeChar = TRIBE_CHAR[def.tribe] ?? '?';
-  const stars = '★'.repeat(def.tier);
+  const lines = describeCard(def)
+  const imgSrc = MINION_IMAGES[def.id] ?? ''
+  const tribeChar = TRIBE_CHAR[def.tribe] ?? '?'
+  const stars = '★'.repeat(def.tier)
 
   // 关键词徽章
-  const kwBadges = (def.keywords ?? []).map((k) => {
-    const cls = k === 'taunt' ? 'k-taunt' : k === 'divineShield' ? 'k-shield' : k === 'reborn' ? 'k-reborn' : k === 'poison' ? 'k-poison' : 'k-windfury';
-    return `<span class="tcd-kw ${cls}">${KEYWORD_NAMES[k]}</span>`;
-  }).join('');
+  const kwBadges = (def.keywords ?? [])
+    .map((k) => {
+      const cls =
+        k === 'taunt'
+          ? 'k-taunt'
+          : k === 'divineShield'
+            ? 'k-shield'
+            : k === 'reborn'
+              ? 'k-reborn'
+              : k === 'poison'
+                ? 'k-poison'
+                : 'k-windfury'
+      return `<span class="tcd-kw ${cls}">${KEYWORD_NAMES[k]}</span>`
+    })
+    .join('')
 
   // 效果说明
-  const effectsHtml = lines.map((l) => `<div class="tcd-effect">${l}</div>`).join('');
+  const effectsHtml = lines.map((l) => `<div class="tcd-effect">${l}</div>`).join('')
 
   // 左侧大图卡
   const imgHtml = imgSrc
     ? `<img class="tcd-img" src="${imgSrc}" alt="${def.name}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="tcd-art-fallback" style="display:none">${def.name.charAt(0)}</div>`
-    : `<div class="tcd-art-fallback" style="display:flex">${def.name.charAt(0)}</div>`;
+    : `<div class="tcd-art-fallback" style="display:flex">${def.name.charAt(0)}</div>`
 
-  const hpClass = curHp < maxHp ? 'damaged' : '';
+  const hpClass = curHp < maxHp ? 'damaged' : ''
 
   return `<div class="tooltip-card-detail tribe-${def.tribe} ${golden ? 'golden' : ''}">
     <div class="tcd-left">
@@ -119,27 +131,34 @@ function cardDetailHtml(def: CardDef, golden: boolean, curHp: number, maxHp: num
       <div class="tcd-effects">${effectsHtml}</div>
       ${def.flavor ? `<div class="tcd-flavor">「${def.flavor}」</div>` : ''}
     </div>
-  </div>`;
+  </div>`
 }
 
 /** 生成随从卡牌 HTML（支持图片 + tooltip） */
 export function minionHtml(
   m: Minion,
-  opts: { hand?: boolean; selected?: boolean; zone?: string; summonIn?: boolean; side?: 'player' | 'enemy' } = {},
+  opts: {
+    hand?: boolean
+    selected?: boolean
+    zone?: string
+    summonIn?: boolean
+    side?: 'player' | 'enemy'
+  } = {},
 ): string {
-  const tribeChar = TRIBE_CHAR[m.tribe] ?? '?';
-  const stars = '★'.repeat(m.tier);
-  const keywords: string[] = [];
-  if (m.keywords.includes('taunt')) keywords.push('<span class="kw-badge k-taunt">嘲</span>');
-  if (m.divineShield) keywords.push('<span class="kw-badge k-shield">盾</span>');
-  if (m.keywords.includes('reborn') && !m.rebornUsed) keywords.push('<span class="kw-badge k-reborn">生</span>');
-  if (m.keywords.includes('poison')) keywords.push('<span class="kw-badge k-poison">毒</span>');
-  if (m.keywords.includes('windfury')) keywords.push('<span class="kw-badge k-windfury">风</span>');
+  const tribeChar = TRIBE_CHAR[m.tribe] ?? '?'
+  const stars = '★'.repeat(m.tier)
+  const keywords: string[] = []
+  if (m.keywords.includes('taunt')) keywords.push('<span class="kw-badge k-taunt">嘲</span>')
+  if (m.divineShield) keywords.push('<span class="kw-badge k-shield">盾</span>')
+  if (m.keywords.includes('reborn') && !m.rebornUsed)
+    keywords.push('<span class="kw-badge k-reborn">生</span>')
+  if (m.keywords.includes('poison')) keywords.push('<span class="kw-badge k-poison">毒</span>')
+  if (m.keywords.includes('windfury')) keywords.push('<span class="kw-badge k-windfury">风</span>')
 
-  const imgSrc = MINION_IMAGES[m.defId] ?? '';
+  const imgSrc = MINION_IMAGES[m.defId] ?? ''
   const imgHtml = imgSrc
     ? `<img class="card-img" src="${imgSrc}" alt="${m.name}" onerror="this.style.display='none'">`
-    : `<div class="card-art">${m.name.charAt(0)}</div>`;
+    : `<div class="card-art">${m.name.charAt(0)}</div>`
 
   const cls = [
     'card',
@@ -155,10 +174,12 @@ export function minionHtml(
     opts.selected ? 'selected' : '',
     opts.summonIn ? 'summon-in' : '',
     opts.side ? `side-${opts.side}` : '',
-  ].filter(Boolean).join(' ');
-  const zoneAttr = opts.zone ? `data-zone="${opts.zone}"` : '';
+  ]
+    .filter(Boolean)
+    .join(' ')
+  const zoneAttr = opts.zone ? `data-zone="${opts.zone}"` : ''
   // tooltip 通过 data-tooltip 属性携带，由全局 mouseover 处理显示
-  const tooltipData = escapeAttr(minionTooltipHtml(m));
+  const tooltipData = escapeAttr(minionTooltipHtml(m))
 
   return `<div class="${cls}" data-uid="${m.uid}" ${zoneAttr} data-tooltip="${tooltipData}">
     ${m.tripleRewardPending ? '<div class="triple-badge">奖</div>' : ''}
@@ -170,20 +191,20 @@ export function minionHtml(
     </div>
     <div class="card-atk">${m.attack}</div>
     <div class="card-hp ${m.health < m.maxHealth && !opts.summonIn ? 'damaged' : ''}">${Math.max(0, m.health)}</div>
-  </div>`;
+  </div>`
 }
 
 function escapeAttr(s: string): string {
-  return s.replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return s.replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
 /** 英雄 HTML（支持图片） */
 function heroHtml(p: PlayerState, isEnemy: boolean): string {
-  const h = p.hero;
-  const imgSrc = HERO_IMAGES[h.id] ?? '';
+  const h = p.hero
+  const imgSrc = HERO_IMAGES[h.id] ?? ''
   const portraitHtml = imgSrc
     ? `<img class="hero-img" src="${imgSrc}" alt="${h.name}" onerror="this.style.display='none'">`
-    : ``;
+    : ``
 
   return `<div class="hero-bar">
     <div class="hero-portrait">${portraitHtml}</div>
@@ -194,31 +215,31 @@ function heroHtml(p: PlayerState, isEnemy: boolean): string {
         ${h.armor > 0 ? `<span class="stat-armor">🛡 ${h.armor}</span>` : ''}
       </span>
     </div>
-  </div>`;
+  </div>`
 }
 
 export interface UIHooks {
-  onBuy: (tavernUid: string) => void;
-  onHandClick: (uid: string) => void;
-  onBoardClick: (uid: string) => void;
-  onPlayToSlot: (boardIndex: number) => void;
-  onSell: () => void;
-  onRefresh: () => void;
-  onFreeze: () => void;
-  onUpgrade: () => void;
-  onCombat: () => void;
-  onRestart: () => void;
-  onTripleRewardPick: (defId: string) => void;
-  onHeroPick: (heroId: string) => void;
+  onBuy: (tavernUid: string) => void
+  onHandClick: (uid: string) => void
+  onBoardClick: (uid: string) => void
+  onPlayToSlot: (boardIndex: number) => void
+  onSell: () => void
+  onRefresh: () => void
+  onFreeze: () => void
+  onUpgrade: () => void
+  onCombat: () => void
+  onRestart: () => void
+  onTripleRewardPick: (defId: string) => void
+  onHeroPick: (heroId: string) => void
 }
 
 /** 渲染开局英雄选择面板（独立函数，不依赖 GameUI 实例） */
 export function renderHeroSelect(root: HTMLElement, onPick: (heroId: string) => void): void {
   const cardsHtml = HEROES.map((h) => {
-    const imgSrc = HERO_IMAGES[h.id] ?? '';
+    const imgSrc = HERO_IMAGES[h.id] ?? ''
     const portraitHtml = imgSrc
       ? `<img class="hero-select-img" src="${imgSrc}" alt="${h.name}" onerror="this.style.display='none'">`
-      : ``;
+      : ``
     return `<div class="hero-select-card" data-hero-id="${h.id}">
       <div class="hero-select-portrait">${portraitHtml}</div>
       <div class="hero-select-name">${h.name}</div>
@@ -231,8 +252,8 @@ export function renderHeroSelect(root: HTMLElement, onPick: (heroId: string) => 
         <div class="hs-power-label">${h.powerName}</div>
         <div class="hs-power-desc">${h.powerDesc}</div>
       </div>
-    </div>`;
-  }).join('');
+    </div>`
+  }).join('')
 
   root.innerHTML = `
     <div class="hero-select-overlay">
@@ -243,82 +264,96 @@ export function renderHeroSelect(root: HTMLElement, onPick: (heroId: string) => 
       <div class="hero-select-cards">${cardsHtml}</div>
       <div class="hero-select-foot">点选英雄即开战 · 敌方英雄将随机指定</div>
     </div>
-  `;
+  `
   root.querySelectorAll<HTMLElement>('.hero-select-card').forEach((el) => {
     el.addEventListener('click', () => {
-      const id = el.dataset.heroId;
-      if (id) onPick(id);
-    });
-  });
+      const id = el.dataset.heroId
+      if (id) onPick(id)
+    })
+  })
 }
 
 export class GameUI {
-  state: GameState;
-  root: HTMLElement;
-  hooks: UIHooks;
-  selection: Selection = null;
+  state: GameState
+  root: HTMLElement
+  hooks: UIHooks
+  selection: Selection = null
 
   constructor(state: GameState, root: HTMLElement, hooks: UIHooks) {
-    this.state = state;
-    this.root = root;
-    this.hooks = hooks;
-    this.bindGlobalTooltip();
+    this.state = state
+    this.root = root
+    this.hooks = hooks
+    this.bindGlobalTooltip()
   }
 
   /** 全局 tooltip：监听 mouseover/mouseout，根据 data-tooltip 显示浮窗 */
   private bindGlobalTooltip(): void {
-    let tooltipEl: HTMLDivElement | null = null;
+    let tooltipEl: HTMLDivElement | null = null
     const ensureTooltip = (): HTMLDivElement => {
       if (!tooltipEl) {
-        tooltipEl = document.createElement('div');
-        tooltipEl.id = 'global-tooltip';
-        tooltipEl.className = 'tooltip-floating';
-        tooltipEl.style.cssText = 'position:fixed;z-index:9999;pointer-events:none;display:none;max-width:440px;';
-        document.body.appendChild(tooltipEl);
+        tooltipEl = document.createElement('div')
+        tooltipEl.id = 'global-tooltip'
+        tooltipEl.className = 'tooltip-floating'
+        tooltipEl.style.cssText =
+          'position:fixed;z-index:9999;pointer-events:none;display:none;max-width:440px;'
+        document.body.appendChild(tooltipEl)
       }
-      return tooltipEl;
-    };
+      return tooltipEl
+    }
     document.addEventListener('mouseover', (e) => {
-      const card = (e.target as HTMLElement).closest('[data-tooltip]') as HTMLElement | null;
-      if (!card) return;
-      const raw = card.getAttribute('data-tooltip');
-      if (!raw) return;
-      const t = ensureTooltip();
-      t.innerHTML = raw.replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
-      t.style.display = 'block';
-      const rect = card.getBoundingClientRect();
-      const tw = t.offsetWidth;
-      const th = t.offsetHeight;
-      let left = rect.left + rect.width / 2 - tw / 2;
-      let top = rect.top - th - 8;
-      if (top < 4) top = rect.bottom + 8; // 下方
-      if (left < 4) left = 4;
-      if (left + tw > window.innerWidth - 4) left = window.innerWidth - tw - 4;
-      t.style.left = left + 'px';
-      t.style.top = top + 'px';
-    });
+      const card = (e.target as HTMLElement).closest('[data-tooltip]') as HTMLElement | null
+      if (!card) return
+      const raw = card.getAttribute('data-tooltip')
+      if (!raw) return
+      const t = ensureTooltip()
+      t.innerHTML = raw
+        .replace(/&quot;/g, '"')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+      t.style.display = 'block'
+      const rect = card.getBoundingClientRect()
+      const tw = t.offsetWidth
+      const th = t.offsetHeight
+      let left = rect.left + rect.width / 2 - tw / 2
+      let top = rect.top - th - 8
+      if (top < 4) top = rect.bottom + 8 // 下方
+      if (left < 4) left = 4
+      if (left + tw > window.innerWidth - 4) left = window.innerWidth - tw - 4
+      t.style.left = left + 'px'
+      t.style.top = top + 'px'
+    })
     document.addEventListener('mouseout', (e) => {
-      const card = (e.target as HTMLElement).closest('[data-tooltip]');
-      if (card && tooltipEl) tooltipEl.style.display = 'none';
-    });
+      const card = (e.target as HTMLElement).closest('[data-tooltip]')
+      if (card && tooltipEl) tooltipEl.style.display = 'none'
+    })
   }
 
   /** 渲染三连奖励三选一面板 */
   renderTripleReward(rewards: CardDef[]): void {
-    const s = this.state;
-    const cardsHtml = rewards.map((def) => {
-      const tooltip = escapeAttr(cardDefTooltipHtml(def));
-      const imgSrc = MINION_IMAGES[def.id] ?? '';
-      const imgHtml = imgSrc
-        ? `<img class="card-img" src="${imgSrc}" alt="${def.name}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="card-art-fallback" style="display:none">${def.name.charAt(0)}</div>`
-        : `<div class="card-art">${def.name.charAt(0)}</div>`;
-      const kwBadges = (def.keywords ?? [])
-        .map((k) => {
-          const cls = k === 'taunt' ? 'taunt' : k === 'divineShield' ? 'shield' : k === 'reborn' ? 'reborn' : k === 'poison' ? 'poison' : 'windfury';
-          return `<span class="kw-badge k-${cls}">${KEYWORD_NAMES[k].charAt(0)}</span>`;
-        })
-        .join('');
-      return `<div class="card reward-card tribe-${def.tribe} ${def.keywords?.includes('taunt') ? 'has-taunt' : ''}" data-reward-id="${def.id}" data-tooltip="${tooltip}">
+    const s = this.state
+    const cardsHtml = rewards
+      .map((def) => {
+        const tooltip = escapeAttr(cardDefTooltipHtml(def))
+        const imgSrc = MINION_IMAGES[def.id] ?? ''
+        const imgHtml = imgSrc
+          ? `<img class="card-img" src="${imgSrc}" alt="${def.name}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="card-art-fallback" style="display:none">${def.name.charAt(0)}</div>`
+          : `<div class="card-art">${def.name.charAt(0)}</div>`
+        const kwBadges = (def.keywords ?? [])
+          .map((k) => {
+            const cls =
+              k === 'taunt'
+                ? 'taunt'
+                : k === 'divineShield'
+                  ? 'shield'
+                  : k === 'reborn'
+                    ? 'reborn'
+                    : k === 'poison'
+                      ? 'poison'
+                      : 'windfury'
+            return `<span class="kw-badge k-${cls}">${KEYWORD_NAMES[k].charAt(0)}</span>`
+          })
+          .join('')
+        return `<div class="card reward-card tribe-${def.tribe} ${def.keywords?.includes('taunt') ? 'has-taunt' : ''}" data-reward-id="${def.id}" data-tooltip="${tooltip}">
         <div class="card-frame">
           <div class="card-stars">${'★'.repeat(def.tier)}</div>
           <div class="card-tribe t-${def.tribe}">${TRIBE_CHAR[def.tribe]}</div>
@@ -327,8 +362,9 @@ export class GameUI {
         </div>
         <div class="card-atk">${def.attack}</div>
         <div class="card-hp">${def.health}</div>
-      </div>`;
-    }).join('');
+      </div>`
+      })
+      .join('')
 
     this.root.innerHTML = `
       <div class="topbar">
@@ -343,46 +379,48 @@ export class GameUI {
         </div>
         <div class="triple-cards">${cardsHtml}</div>
       </div>
-    `;
+    `
     this.root.querySelectorAll<HTMLElement>('.reward-card').forEach((el) => {
       el.addEventListener('click', () => {
-        const id = el.dataset.rewardId;
-        if (id) this.hooks.onTripleRewardPick(id);
-      });
-    });
+        const id = el.dataset.rewardId
+        if (id) this.hooks.onTripleRewardPick(id)
+      })
+    })
   }
 
   /** 渲染招募阶段 - 布局：顶部英雄栏+控制 → 酒馆行 → 战场行 → 手牌悬浮底栏 */
   renderRecruit(): void {
-    const s = this.state;
+    const s = this.state
     const selUid =
       this.selection?.type === 'hand' || this.selection?.type === 'board'
         ? this.selection.uid
-        : null;
+        : null
 
-    const tavernCards = s.player.tavern.map((m) => minionHtml(m, { zone: 'tavern' })).join('');
+    const tavernCards = s.player.tavern.map((m) => minionHtml(m, { zone: 'tavern' })).join('')
     const handCards = s.player.hand
       .map((m) => minionHtml(m, { hand: true, selected: m.uid === selUid, zone: 'hand' }))
-      .join('');
+      .join('')
     const boardCards = s.player.board
       .map((m) => minionHtml(m, { selected: m.uid === selUid, zone: 'board', side: 'player' }))
-      .join('');
-    const emptySlot = s.player.board.length < 7
-      ? `<div class="board-slot drop-target" data-slot="board-${s.player.board.length}"></div>`
-      : '';
+      .join('')
+    const emptySlot =
+      s.player.board.length < 7
+        ? `<div class="board-slot drop-target" data-slot="board-${s.player.board.length}"></div>`
+        : ''
 
-    const canUpgrade = s.player.tavernTier < 6 && s.player.gold >= s.player.upgradeCost;
-    const hasFreeRefresh = s.player.hero.power === 'freeRefreshOnce' && !s.player.hero.freeRefreshUsed;
-    const canRefresh = hasFreeRefresh || s.player.gold >= 1;
-    const refreshCost = hasFreeRefresh ? 0 : 1;
-    const canSell = this.selection?.type === 'board';
+    const canUpgrade = s.player.tavernTier < 6 && s.player.gold >= s.player.upgradeCost
+    const hasFreeRefresh =
+      s.player.hero.power === 'freeRefreshOnce' && !s.player.hero.freeRefreshUsed
+    const canRefresh = hasFreeRefresh || s.player.gold >= 1
+    const refreshCost = hasFreeRefresh ? 0 : 1
+    const canSell = this.selection?.type === 'board'
 
     const hint =
       this.selection?.type === 'hand'
         ? '点击战场空位或随从前方放置'
         : this.selection?.type === 'board'
           ? '点另一随从交换站位 · 再点取消 · 点卖出'
-          : '点酒馆购买 · 点手牌选中放置 · 点战场调整站位';
+          : '点酒馆购买 · 点手牌选中放置 · 点战场调整站位'
 
     this.root.innerHTML = `
       <!-- ====== 顶部：英雄 + 控制按钮（对齐官方）====== -->
@@ -443,41 +481,41 @@ export class GameUI {
           <div class="hand-zone" id="player-hand">${handCards || '<span class="empty-hand">手牌为空</span>'}</div>
         </div>
       </div>
-    `;
-    this.bindRecruitEvents();
+    `
+    this.bindRecruitEvents()
   }
 
   private bindRecruitEvents(): void {
-    const root = this.root;
+    const root = this.root
     root.querySelector('#tavern-cards')?.addEventListener('click', (e) => {
-      const card = (e.target as HTMLElement).closest('.card') as HTMLElement | null;
-      if (card?.dataset.uid) this.hooks.onBuy(card.dataset.uid);
-    });
+      const card = (e.target as HTMLElement).closest('.card') as HTMLElement | null
+      if (card?.dataset.uid) this.hooks.onBuy(card.dataset.uid)
+    })
     root.querySelector('#player-hand')?.addEventListener('click', (e) => {
-      const card = (e.target as HTMLElement).closest('.card') as HTMLElement | null;
-      if (card?.dataset.uid) this.hooks.onHandClick(card.dataset.uid);
-    });
+      const card = (e.target as HTMLElement).closest('.card') as HTMLElement | null
+      if (card?.dataset.uid) this.hooks.onHandClick(card.dataset.uid)
+    })
     root.querySelector('#player-board')?.addEventListener('click', (e) => {
-      const card = (e.target as HTMLElement).closest('.card') as HTMLElement | null;
+      const card = (e.target as HTMLElement).closest('.card') as HTMLElement | null
       if (card?.dataset.uid) {
-        this.hooks.onBoardClick(card.dataset.uid);
+        this.hooks.onBoardClick(card.dataset.uid)
       } else {
-        const slot = (e.target as HTMLElement).closest('[data-slot]') as HTMLElement | null;
+        const slot = (e.target as HTMLElement).closest('[data-slot]') as HTMLElement | null
         if (slot?.dataset.slot) {
-          const idx = parseInt(slot.dataset.slot.replace('board-', ''), 10);
-          this.hooks.onPlayToSlot(idx);
+          const idx = parseInt(slot.dataset.slot.replace('board-', ''), 10)
+          this.hooks.onPlayToSlot(idx)
         }
       }
-    });
-    root.querySelector('#btn-refresh')?.addEventListener('click', () => this.hooks.onRefresh());
-    root.querySelector('#btn-freeze')?.addEventListener('click', () => this.hooks.onFreeze());
-    root.querySelector('#btn-upgrade')?.addEventListener('click', () => this.hooks.onUpgrade());
-    root.querySelector('#btn-sell')?.addEventListener('click', () => this.hooks.onSell());
-    root.querySelector('#btn-combat')?.addEventListener('click', () => this.hooks.onCombat());
+    })
+    root.querySelector('#btn-refresh')?.addEventListener('click', () => this.hooks.onRefresh())
+    root.querySelector('#btn-freeze')?.addEventListener('click', () => this.hooks.onFreeze())
+    root.querySelector('#btn-upgrade')?.addEventListener('click', () => this.hooks.onUpgrade())
+    root.querySelector('#btn-sell')?.addEventListener('click', () => this.hooks.onSell())
+    root.querySelector('#btn-combat')?.addEventListener('click', () => this.hooks.onCombat())
     root.querySelector('#btn-mute')?.addEventListener('click', () => {
-      toggleMute();
-      this.renderRecruit();
-    });
+      toggleMute()
+      this.renderRecruit()
+    })
   }
 
   /** 渲染战斗阶段（双方棋盘上下对峙 + 右侧日志） */
@@ -489,13 +527,13 @@ export class GameUI {
     sub: string,
     summonedUid?: string,
   ): void {
-    const s = this.state;
+    const s = this.state
     const eHtml = enemyBoard
       .map((m) => minionHtml(m, { side: 'enemy', summonIn: m.uid === summonedUid }))
-      .join('');
+      .join('')
     const pHtml = playerBoard
       .map((m) => minionHtml(m, { side: 'player', summonIn: m.uid === summonedUid }))
-      .join('');
+      .join('')
 
     this.root.innerHTML = `
       <div class="topbar">
@@ -518,50 +556,51 @@ export class GameUI {
         </div>
         <div class="combat-log visible" id="combat-log">${logHtml}</div>
       </div>
-    `;
+    `
   }
 
   /** 轻量更新：只更新日志和标题，不重建棋盘 DOM */
   updateCombatLogAndTitle(logHtml: string, title: string, sub: string): void {
-    const logEl = this.root.querySelector('#combat-log');
-    if (logEl) logEl.innerHTML = logHtml;
-    const titleEl = this.root.querySelector('.message-title');
-    if (titleEl) titleEl.textContent = title;
-    const subEl = this.root.querySelector('.message-sub');
-    if (subEl) subEl.textContent = sub;
+    const logEl = this.root.querySelector('#combat-log')
+    if (logEl) logEl.innerHTML = logHtml
+    const titleEl = this.root.querySelector('.message-title')
+    if (titleEl) titleEl.textContent = title
+    const subEl = this.root.querySelector('.message-sub')
+    if (subEl) subEl.textContent = sub
   }
 
   /** 轻量更新：根据快照原地更新 HP / 攻击力 / 圣盾状态，不重建 DOM */
   updateCombatHp(pBoard: Minion[], eBoard: Minion[]): void {
     const updateSide = (board: Minion[], zoneSelector: string) => {
-      const zone = this.root.querySelector(zoneSelector);
-      if (!zone) return;
+      const zone = this.root.querySelector(zoneSelector)
+      if (!zone) return
       for (const m of board) {
-        const el = zone.querySelector(`[data-uid="${m.uid}"]`) as HTMLElement | null;
-        if (!el) continue;
-        const hpEl = el.querySelector('.card-hp');
+        const el = zone.querySelector(`[data-uid="${m.uid}"]`) as HTMLElement | null
+        if (!el) continue
+        const hpEl = el.querySelector('.card-hp')
         if (hpEl) {
-          const val = Math.max(0, m.health);
-          hpEl.textContent = String(val);
-          hpEl.classList.toggle('damaged', m.health < m.maxHealth);
+          const val = Math.max(0, m.health)
+          hpEl.textContent = String(val)
+          hpEl.classList.toggle('damaged', m.health < m.maxHealth)
         }
-        const atkEl = el.querySelector('.card-atk');
-        if (atkEl) atkEl.textContent = String(m.attack);
-        el.classList.toggle('has-shield', m.divineShield);
+        const atkEl = el.querySelector('.card-atk')
+        if (atkEl) atkEl.textContent = String(m.attack)
+        el.classList.toggle('has-shield', m.divineShield)
       }
-    };
-    updateSide(pBoard, '#player-board');
-    updateSide(eBoard, '#board-enemy');
+    }
+    updateSide(pBoard, '#player-board')
+    updateSide(eBoard, '#board-enemy')
   }
 
   renderGameOver(): void {
-    const s = this.state;
-    const winText = s.winner === 'player' ? '胜' : s.winner === 'enemy' ? '败' : '和';
-    const sub = s.winner === 'player'
-      ? '荡平妖氛，凯旋而归！'
-      : s.winner === 'enemy'
-        ? '兵败如山倒，卷土重来？'
-        : '两败俱伤，势均力敌。';
+    const s = this.state
+    const winText = s.winner === 'player' ? '胜' : s.winner === 'enemy' ? '败' : '和'
+    const sub =
+      s.winner === 'player'
+        ? '荡平妖氛，凯旋而归！'
+        : s.winner === 'enemy'
+          ? '兵败如山倒，卷土重来？'
+          : '两败俱伤，势均力敌。'
     this.root.innerHTML = `
       <div class="topbar">
         ${heroHtml(s.enemy, true)}
@@ -573,7 +612,7 @@ export class GameUI {
         <div class="sub">${sub}</div>
         <button class="btn btn-primary" id="btn-restart">再战一局</button>
       </div>
-    `;
-    this.root.querySelector('#btn-restart')?.addEventListener('click', () => this.hooks.onRestart());
+    `
+    this.root.querySelector('#btn-restart')?.addEventListener('click', () => this.hooks.onRestart())
   }
 }
