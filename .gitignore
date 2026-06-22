@@ -1,3 +1,26 @@
 /.workbuddy
 /node_modules
 /overview.md
+
+# 构建产物
+/dist
+/.build-tmp
+
+# Android 构建产物（保留源码，忽略构建结果）
+/android/app/build
+/android/.gradle
+/android/local.properties
+/android/captures
+/android/app/release
+*.apk
+*.aab
+
+# Gradle
+/android/app/.cxx
+
+# IDE
+/android/.idea
+*.iml
+
+# 日志
+*.log

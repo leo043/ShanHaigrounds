@@ -725,3 +725,105 @@ html, body {
   font-family:'ZCOOL XiaoWei',serif;font-size:14px;color:var(--ink-soft);
   letter-spacing:1px;opacity:.8;
 }
+
+/* ============ 手机横屏适配（max-height 500px = 手机横屏高度） ============
+   桌面浏览器高度 > 500px 不触发，不影响 PC 端体验。
+   参考官方酒馆战棋手机横屏布局：居中、紧凑、无日志侧栏。
+*/
+@media screen and (max-height: 500px) {
+
+  /* ---- 顶部栏：紧凑化 ---- */
+  .topbar{padding:3px 10px}
+  .hero-portrait{width:34px;height:34px;border-width:1px}
+  .hero-name{font-size:12px}
+  .hero-stats{font-size:10px;gap:4px}
+  .turn-info{font-size:12px}
+
+  /* ---- 控制行：更紧凑 ---- */
+  .control-row{padding:3px 10px;gap:4px}
+  .ctrl-btn{width:36px;height:42px;border-radius:4px;border-width:1px}
+  .ctrl-icon{font-size:15px}
+  .ctrl-cost{font-size:9px}
+  .gold-display{font-size:12px}
+
+  /* ---- 主区域：减少内边距和间距 ---- */
+  .main-area{gap:3px;padding:4px 8px}
+
+  /* 行标签隐藏（节省水平空间） */
+  .row-label{display:none}
+
+  /* 酒馆行 */
+  .tavern-row{min-height:80px;padding:2px 0;gap:4px}
+  .tavern-cards{min-height:76px;justify-content:center;gap:4px;padding:2px 4px}
+
+  /* 战场行 */
+  .board-row{min-height:80px;padding:2px 0;gap:4px}
+  .board-zone{min-height:76px;gap:4px;padding:3px;border-radius:4px}
+  .board-slot{width:58px;height:82px;border-radius:5px}
+
+  /* 手牌行 */
+  .hand-row{min-height:88px;padding:2px 0;gap:4px}
+  .hand-zone{min-height:84px;justify-content:center;gap:4px;padding:2px 4px}
+
+  /* 提示条：缩小或隐藏 */
+  .hint-bar{font-size:10px;padding:1px 0}
+  .enemy-tag{display:none}/* 移动端不显示敌方备战摘要 */
+
+  /* 卡牌尺寸微缩 */
+  .card{width:60px;height:84px;border-radius:6px}
+  .card.hand-size{width:66px;height:92px}
+  .card-atk,.card-hp{width:22px;height:22px;font-size:13px;line-height:22px;border-radius:50%}
+  .card-stars{font-size:7px}
+  .card-tribe{width:12px;height:12px;font-size:8px;top:1px;right:1px}
+  .kw-badge{width:11px;height:11px;font-size:7px}
+  .card-keywords{top:9px;left:1px;gap:1px}
+
+  /* 三连奖励面板 */
+  .triple-banner .triple-title{font-size:24px}
+  .triple-banner .triple-sub{font-size:12px}
+  .triple-cards{gap:12px}
+  .reward-card{width:90px;height:126px}
+  .triple-cards .reward-card .card-atk,
+  .triple-cards .reward-card .card-hp{width:26px;height:26px;font-size:14px}
+
+  /* 英雄选择面板 */
+  .hero-select-h1{font-size:38px;letter-spacing:4px}
+  .hero-select-sub{font-size:14px}
+  .hero-select-card{width:130px;padding:12px 10px 10px;gap:5px}
+  .hero-select-portrait{width:64px;height:64px;border-width:2px}
+  .hero-select-name{font-size:18px}
+  .hero-select-title{font-size:11px}
+  .hero-select-stats{font-size:11px}
+  .hs-power-label{font-size:10px}
+  .hs-power-desc{font-size:10px}
+  .hero-select-foot{font-size:11px;display:none}
+
+  /* ====== 战斗阶段：去掉日志，全屏双阵营上下对峙 ====== */
+  .combat-layout{flex-direction:column;justify-content:flex-start;gap:2px;align-items:center}
+  .combat-side{min-height:85px;width:100%;justify-content:center}
+  .combat-center{padding:4px 10px;min-width:auto}
+  .combat-center .message-title{font-size:20px}
+  .combat-center .message-sub{font-size:11px;margin-top:2px}
+
+  /* 战斗日志完全隐藏（手机横屏空间不够） */
+  .combat-log{display:none!important}
+
+  /* 游戏结束 */
+  .gameover-overlay h1{font-size:48px;letter-spacing:6px;margin-bottom:10px}
+  .gameover-overlay .sub{font-size:14px}
+  .gameover-overlay .btn{padding:8px 20px;font-size:16px}
+
+  /* tooltip 缩小 */
+  #global-tooltip{max-width:340px;transform:scale(0.9);transform-origin:top center}
+
+  /* 悬停详情大卡缩小 */
+  .tcd-img{height:85px;top:14px}
+  .tcd-card-big{}
+  .tcd-atk-big,.tcd-hp-big{width:26px;height:26px;font-size:14px}
+  .tcd-left{width:110px}
+  .tcd-title{font-size:13px}
+  .tcd-meta{font-size:10px}
+  .tcd-effect{font-size:10px}
+  .tcd-flavor{font-size:10px}
+  .tcd-kw{font-size:7px;width:16px;height:16px}
+}
