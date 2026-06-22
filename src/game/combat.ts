@@ -350,6 +350,34 @@ function cleanupDead(
             text: `【${m.name}】亡语：对【${t.name}】造成 ${e.damage} 点伤害`,
           });
         }
+      } else if (e.target === 'adjacent') {
+        const pos = finalBoard.length;
+        // 左相邻：finalBoard 最后一个
+        if (pos > 0 && e.buffAttack) {
+          const left = finalBoard[pos - 1];
+          left.attack += e.buffAttack;
+          if (e.buffHealth) { left.health += e.buffHealth; left.maxHealth += e.buffHealth; }
+          steps.push({
+            type: 'info',
+            snap: makeSnapFromArr(finalBoard),
+            text: `【${m.name}】亡语：给【${left.name}】+${e.buffAttack}/${e.buffHealth ?? 0}`,
+          });
+        }
+        // 右相邻：board 中下一个存活的随从
+        const boardIdx = board.indexOf(m);
+        for (let j = boardIdx + 1; j < board.length; j++) {
+          if (board[j].health > 0 && e.buffAttack) {
+            const right = board[j];
+            right.attack += e.buffAttack;
+            if (e.buffHealth) { right.health += e.buffHealth; right.maxHealth += e.buffHealth; }
+            steps.push({
+              type: 'info',
+              snap: makeSnapFromArr(finalBoard),
+              text: `【${m.name}】亡语：给【${right.name}】+${e.buffAttack}/${e.buffHealth ?? 0}`,
+            });
+            break;
+          }
+        }
       }
     }
     // 无复生无召唤：随从消失，不加入 finalBoard
