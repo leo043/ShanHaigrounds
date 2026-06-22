@@ -1,7 +1,7 @@
 // 卡牌与英雄 HTML 渲染单元
-import type { Minion, PlayerState } from '../game/types'
+import type { Minion, CardDef, PlayerState } from '../game/types'
 import { MINION_IMAGES, HERO_IMAGES } from '../config/assets'
-import { TRIBE_CHAR, escapeAttr, minionTooltipHtml } from './tooltip'
+import { TRIBE_CHAR, escapeAttr, minionTooltipHtml, cardDefTooltipHtml } from './tooltip'
 
 /** 生成随从卡牌 HTML（支持图片 + tooltip） */
 export function minionHtml(
@@ -80,5 +80,49 @@ export function heroHtml(p: PlayerState, isEnemy: boolean): string {
         ${h.armor > 0 ? `<span class="stat-armor">🛡 ${h.armor}</span>` : ''}
       </span>
     </div>
+  </div>`
+}
+
+/** 图鉴用卡牌 HTML（基于 CardDef，支持悬停 tooltip） */
+export function codexCardHtml(def: CardDef): string {
+  const tribeChar = TRIBE_CHAR[def.tribe] ?? '?'
+  const stars = '★'.repeat(def.tier)
+  const keywords: string[] = []
+  if (def.keywords?.includes('taunt')) keywords.push('<span class="kw-badge k-taunt">嘲</span>')
+  if (def.keywords?.includes('divineShield'))
+    keywords.push('<span class="kw-badge k-shield">盾</span>')
+  if (def.keywords?.includes('reborn')) keywords.push('<span class="kw-badge k-reborn">生</span>')
+  if (def.keywords?.includes('poison')) keywords.push('<span class="kw-badge k-poison">毒</span>')
+  if (def.keywords?.includes('windfury'))
+    keywords.push('<span class="kw-badge k-windfury">风</span>')
+
+  const imgSrc = MINION_IMAGES[def.id] ?? ''
+  const imgHtml = imgSrc
+    ? `<img class="card-img" src="${imgSrc}" alt="${def.name}" onerror="this.style.display='none'">`
+    : `<div class="card-art">${def.name.charAt(0)}</div>`
+
+  const cls = [
+    'card',
+    `tribe-${def.tribe}`,
+    def.keywords?.includes('taunt') ? 'has-taunt' : '',
+    def.keywords?.includes('divineShield') ? 'has-shield' : '',
+    def.keywords?.includes('reborn') ? 'has-reborn' : '',
+    def.keywords?.includes('poison') ? 'has-poison' : '',
+    def.keywords?.includes('windfury') ? 'has-windfury' : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
+
+  const tooltipData = escapeAttr(cardDefTooltipHtml(def))
+
+  return `<div class="${cls}" data-tooltip="${tooltipData}">
+    <div class="card-frame">
+      <div class="card-stars">${stars}</div>
+      <div class="card-tribe t-${def.tribe}">${tribeChar}</div>
+      <div class="card-keywords">${keywords.join('')}</div>
+      ${imgHtml}
+    </div>
+    <div class="card-atk">${def.attack}</div>
+    <div class="card-hp">${def.health}</div>
   </div>`
 }

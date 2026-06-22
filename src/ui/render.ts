@@ -1,10 +1,10 @@
 // UI 渲染主协调 - GameUI 类、英雄选择、阶段渲染与交互绑定
 import type { GameState, Minion, CardDef } from '../game/types'
-import { KEYWORD_NAMES, HEROES } from '../game/cards'
+import { KEYWORD_NAMES, HEROES, CARDS } from '../game/cards'
 import { toggleMute, isMuted } from '../game/audio'
 import { MINION_IMAGES, HERO_IMAGES } from '../config/assets'
 import { escapeAttr, cardDefTooltipHtml, TRIBE_CHAR } from './tooltip'
-import { minionHtml, heroHtml } from './cards'
+import { minionHtml, heroHtml, codexCardHtml } from './cards'
 
 export type Selection = { type: 'hand'; uid: string } | { type: 'board'; uid: string } | null
 
@@ -63,6 +63,191 @@ export function renderHeroSelect(root: HTMLElement, onPick: (heroId: string) => 
   })
 }
 
+/** 渲染主菜单 */
+export function renderMainMenu(
+  root: HTMLElement,
+  onAdventure: () => void,
+  onCodex: () => void,
+  onRoom: () => void,
+): void {
+  root.innerHTML = `
+    <div class="main-menu-overlay">
+      <div class="main-menu-title">山海战棋</div>
+      <div class="main-menu-subtitle">东方神话酒馆战棋</div>
+      <div class="main-menu-cards">
+        <div class="main-menu-card" data-action="adventure">
+          <div class="menu-card-icon">⚔</div>
+          <div class="menu-card-title">冒险模式</div>
+          <div class="menu-card-desc">选择英雄，招募随从，击败对手</div>
+        </div>
+        <div class="main-menu-card" data-action="codex">
+          <div class="menu-card-icon">📖</div>
+          <div class="menu-card-title">随从图鉴</div>
+          <div class="menu-card-desc">浏览所有随从卡牌，了解技能详情</div>
+        </div>
+        <div class="main-menu-card disabled" data-action="room">
+          <div class="menu-card-badge">敬请期待</div>
+          <div class="menu-card-icon">🏠</div>
+          <div class="menu-card-title">创建房间</div>
+          <div class="menu-card-desc">与好友对战，更多玩法即将上线</div>
+        </div>
+      </div>
+    </div>
+  `
+  root.querySelector('[data-action="adventure"]')?.addEventListener('click', onAdventure)
+  root.querySelector('[data-action="codex"]')?.addEventListener('click', onCodex)
+  root.querySelector('[data-action="room"]')?.addEventListener('click', onRoom)
+}
+
+/** 渲染随从图鉴 */
+export function renderCodex(root: HTMLElement, onBack: () => void): void {
+  bindGlobalTooltip()
+  const tribes: Array<{ key: string; label: string }> = [
+    { key: 'all', label: '全部' },
+    { key: 'human', label: '人族' },
+    { key: 'demon', label: '妖族' },
+    { key: 'spirit', label: '仙族' },
+  ]
+  const tiers: Array<{ key: number | 'all'; label: string }> = [
+    { key: 'all', label: '全部' },
+    { key: 1, label: '★' },
+    { key: 2, label: '★★' },
+    { key: 3, label: '★★★' },
+    { key: 4, label: '★★★★' },
+    { key: 5, label: '★★★★★' },
+  ]
+
+  let filterTribe = 'all'
+  let filterTier: number | 'all' = 'all'
+
+  function renderCards(): void {
+    const filtered = CARDS.filter((c) => {
+      if (filterTribe !== 'all' && c.tribe !== filterTribe) return false
+      if (filterTier !== 'all' && c.tier !== filterTier) return false
+      return true
+    })
+
+    const cardsHtml = filtered.map((def) => codexCardHtml(def)).join('')
+    const body = root.querySelector('.codex-body')
+    if (body) {
+      body.innerHTML = cardsHtml
+        ? `<div class="codex-cards">${cardsHtml}</div>`
+        : '<div class="codex-empty">没有符合条件的随从</div>'
+    }
+
+    // 更新计数
+    const countEl = root.querySelector('.codex-count')
+    if (countEl) {
+      countEl.textContent = `${filtered.length} / ${CARDS.length}`
+    }
+
+    // 更新筛选按钮状态
+    root.querySelectorAll<HTMLElement>('[data-filter-tribe]').forEach((el) => {
+      el.classList.toggle('active', el.dataset.filterTribe === filterTribe)
+    })
+    root.querySelectorAll<HTMLElement>('[data-filter-tier]').forEach((el) => {
+      const val = el.dataset.filterTier
+      el.classList.toggle('active', val === String(filterTier))
+    })
+  }
+
+  const tribeBtns = tribes
+    .map(
+      (t) =>
+        `<button class="codex-filter-btn${t.key === filterTribe ? ' active' : ''}" data-filter-tribe="${t.key}">${t.label}</button>`,
+    )
+    .join('')
+
+  const tierBtns = tiers
+    .map(
+      (t) =>
+        `<button class="codex-filter-btn${t.key === filterTier ? ' active' : ''}" data-filter-tier="${t.key}">${t.label}</button>`,
+    )
+    .join('')
+
+  root.innerHTML = `
+    <div class="codex-overlay">
+      <div class="codex-topbar">
+        <div class="codex-back" id="codex-back">←</div>
+        <div class="codex-title">随从图鉴</div>
+        <span class="codex-count">${CARDS.length} / ${CARDS.length}</span>
+        <div class="codex-filters">
+          <span style="font-size:12px;color:var(--gold-light);margin-right:2px">种族</span>
+          ${tribeBtns}
+          <div class="codex-filter-sep"></div>
+          <span style="font-size:12px;color:var(--gold-light);margin-right:2px">星级</span>
+          ${tierBtns}
+        </div>
+      </div>
+      <div class="codex-body"></div>
+    </div>
+  `
+
+  root.querySelector('#codex-back')?.addEventListener('click', onBack)
+
+  root.querySelectorAll<HTMLElement>('[data-filter-tribe]').forEach((el) => {
+    el.addEventListener('click', () => {
+      filterTribe = el.dataset.filterTribe ?? 'all'
+      renderCards()
+    })
+  })
+
+  root.querySelectorAll<HTMLElement>('[data-filter-tier]').forEach((el) => {
+    el.addEventListener('click', () => {
+      const val = el.dataset.filterTier ?? 'all'
+      filterTier = val === 'all' ? 'all' : parseInt(val, 10)
+      renderCards()
+    })
+  })
+
+  renderCards()
+}
+
+/** 全局 tooltip：监听 mouseover/mouseout，根据 data-tooltip 显示浮窗（只绑定一次） */
+let tooltipBound = false
+function bindGlobalTooltip(): void {
+  if (tooltipBound) return
+  tooltipBound = true
+  let tooltipEl: HTMLDivElement | null = null
+  const ensureTooltip = (): HTMLDivElement => {
+    if (!tooltipEl) {
+      tooltipEl = document.createElement('div')
+      tooltipEl.id = 'global-tooltip'
+      tooltipEl.className = 'tooltip-floating'
+      tooltipEl.style.cssText =
+        'position:fixed;z-index:9999;pointer-events:none;display:none;max-width:440px;'
+      document.body.appendChild(tooltipEl)
+    }
+    return tooltipEl
+  }
+  document.addEventListener('mouseover', (e) => {
+    const card = (e.target as HTMLElement).closest('[data-tooltip]') as HTMLElement | null
+    if (!card) return
+    const raw = card.getAttribute('data-tooltip')
+    if (!raw) return
+    const t = ensureTooltip()
+    t.innerHTML = raw
+      .replace(/&quot;/g, '"')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+    t.style.display = 'block'
+    const rect = card.getBoundingClientRect()
+    const tw = t.offsetWidth
+    const th = t.offsetHeight
+    let left = rect.left + rect.width / 2 - tw / 2
+    let top = rect.top - th - 8
+    if (top < 4) top = rect.bottom + 8 // 下方
+    if (left < 4) left = 4
+    if (left + tw > window.innerWidth - 4) left = window.innerWidth - tw - 4
+    t.style.left = left + 'px'
+    t.style.top = top + 'px'
+  })
+  document.addEventListener('mouseout', (e) => {
+    const card = (e.target as HTMLElement).closest('[data-tooltip]')
+    if (card && tooltipEl) tooltipEl.style.display = 'none'
+  })
+}
+
 export class GameUI {
   state: GameState
   root: HTMLElement
@@ -73,49 +258,7 @@ export class GameUI {
     this.state = state
     this.root = root
     this.hooks = hooks
-    this.bindGlobalTooltip()
-  }
-
-  /** 全局 tooltip：监听 mouseover/mouseout，根据 data-tooltip 显示浮窗 */
-  private bindGlobalTooltip(): void {
-    let tooltipEl: HTMLDivElement | null = null
-    const ensureTooltip = (): HTMLDivElement => {
-      if (!tooltipEl) {
-        tooltipEl = document.createElement('div')
-        tooltipEl.id = 'global-tooltip'
-        tooltipEl.className = 'tooltip-floating'
-        tooltipEl.style.cssText =
-          'position:fixed;z-index:9999;pointer-events:none;display:none;max-width:440px;'
-        document.body.appendChild(tooltipEl)
-      }
-      return tooltipEl
-    }
-    document.addEventListener('mouseover', (e) => {
-      const card = (e.target as HTMLElement).closest('[data-tooltip]') as HTMLElement | null
-      if (!card) return
-      const raw = card.getAttribute('data-tooltip')
-      if (!raw) return
-      const t = ensureTooltip()
-      t.innerHTML = raw
-        .replace(/&quot;/g, '"')
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>')
-      t.style.display = 'block'
-      const rect = card.getBoundingClientRect()
-      const tw = t.offsetWidth
-      const th = t.offsetHeight
-      let left = rect.left + rect.width / 2 - tw / 2
-      let top = rect.top - th - 8
-      if (top < 4) top = rect.bottom + 8 // 下方
-      if (left < 4) left = 4
-      if (left + tw > window.innerWidth - 4) left = window.innerWidth - tw - 4
-      t.style.left = left + 'px'
-      t.style.top = top + 'px'
-    })
-    document.addEventListener('mouseout', (e) => {
-      const card = (e.target as HTMLElement).closest('[data-tooltip]')
-      if (card && tooltipEl) tooltipEl.style.display = 'none'
-    })
+    bindGlobalTooltip()
   }
 
   /** 渲染三连奖励三选一面板 */

@@ -19,7 +19,7 @@ import {
 import { simulateCombat } from './game/combat'
 import type { CombatResult, CombatStep } from './game/combat'
 import { runAITurn } from './game/ai'
-import { GameUI, renderHeroSelect } from './ui/render'
+import { GameUI, renderHeroSelect, renderMainMenu, renderCodex } from './ui/render'
 import { CARD_MAP, HEROES } from './game/cards'
 import type { Minion } from './game/types'
 import * as sfx from './game/audio'
@@ -389,8 +389,7 @@ class GameController {
   }
 
   private onRestart(): void {
-    // 再战一局：回到英雄选择
-    bootstrap()
+    showMainMenu()
   }
 }
 
@@ -398,12 +397,24 @@ class GameController {
 
 const appRoot = document.getElementById('app')!
 
-/** 启动：先渲染英雄选择面板 */
-function bootstrap(): void {
+function showMainMenu(): void {
+  renderMainMenu(
+    appRoot,
+    () => showHeroSelect(),
+    () => showCodex(),
+    () => {},
+  )
+}
+
+function showHeroSelect(): void {
   renderHeroSelect(appRoot, (heroId) => {
     new GameController(heroId, appRoot)
   })
 }
 
-// 启动：先选英雄
-bootstrap()
+function showCodex(): void {
+  renderCodex(appRoot, () => showMainMenu())
+}
+
+// 启动：显示主菜单
+showMainMenu()
