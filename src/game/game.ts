@@ -140,7 +140,7 @@ export function buyMinion(player: PlayerState, tavernIndex: number): void {
 export function sellMinion(player: PlayerState, boardIndex: number): boolean {
   if (boardIndex < 0 || boardIndex >= player.board.length) return false
   player.board.splice(boardIndex, 1)
-  player.gold = Math.min(player.maxGold, player.gold + 1)
+  player.gold += 1
   return true
 }
 
