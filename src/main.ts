@@ -58,6 +58,9 @@ function startGameWithHero(playerHeroId: string): void {
     onRestart,
     onTripleRewardPick,
     onHeroPick: () => {}, // 选英雄阶段已用独立函数处理，此处留空
+    onDragBuyToBoard,
+    onDragPlayToSlot,
+    onDragRearrangeBoard,
   });
   ui.renderRecruit();
 }
@@ -129,6 +132,63 @@ function onPlayToSlot(boardIndex: number): void {
     sfx.sfxBuy();
     ui.renderRecruit();
   }
+}
+
+// ============ 拖拽专用交互 ============
+
+/** 拖拽酒馆卡牌直接到战场：一步购买+上场 */
+function onDragBuyToBoard(tavernUid: string, boardInsertIndex: number): void {
+  const tavernIdx = state.player.tavern.findIndex((m) => m.uid === tavernUid);
+  if (tavernIdx < 0) return;
+  if (state.player.gold < 3) return;
+  if (state.player.board.length >= 7) return;
+  // 1. 先从酒馆买出（加入手牌末尾）
+  buyMinion(state.player, tavernIdx);
+  // 2. 找到刚买的卡（在手牌末尾，因为 buyMinion 用 push）
+  const handIdx = state.player.hand.length - 1;
+  // 3. 立即打到指定战场位置
+  const insertAt = Math.min(boardInsertIndex, state.player.board.length);
+  const triggerReward = playMinion(state.player, handIdx, insertAt);
+  ui.selection = null;
+  if (triggerReward) {
+    sfx.sfxTriple();
+    showTripleReward();
+  } else {
+    sfx.sfxBuy();
+    ui.renderRecruit();
+  }
+}
+
+/** 拖拽手牌到战场指定插入位置 */
+function onDragPlayToSlot(handUid: string, boardInsertIndex: number): void {
+  const handIdx = state.player.hand.findIndex((m) => m.uid === handUid);
+  if (handIdx < 0) return;
+  if (state.player.board.length >= 7) return;
+  const insertAt = Math.min(boardInsertIndex, state.player.board.length);
+  const triggerReward = playMinion(state.player, handIdx, insertAt);
+  ui.selection = null;
+  if (triggerReward) {
+    sfx.sfxTriple();
+    showTripleReward();
+  } else {
+    sfx.sfxBuy();
+    ui.renderRecruit();
+  }
+}
+
+/** 战场内拖拽重排：把卡牌从当前位置移到新位置 */
+function onDragRearrangeBoard(boardUid: string, newInsertIndex: number): void {
+  const currentIdx = state.player.board.findIndex((m) => m.uid === boardUid);
+  if (currentIdx < 0) return;
+  // splice 移除再插入
+  const [moved] = state.player.board.splice(currentIdx, 1);
+  // 如果移除位置在目标位置之前，目标位置要 -1（因为数组缩短了）
+  const adjustedIdx = currentIdx < newInsertIndex ? newInsertIndex - 1 : newInsertIndex;
+  const insertAt = Math.min(adjustedIdx, state.player.board.length);
+  state.player.board.splice(insertAt, 0, moved);
+  sfx.sfxSelect();
+  ui.selection = null;
+  ui.renderRecruit();
 }
 
 // ============ 三连奖励 ============

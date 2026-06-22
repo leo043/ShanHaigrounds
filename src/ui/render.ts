@@ -126,7 +126,7 @@ function cardDetailHtml(def: CardDef, golden: boolean, curHp: number, maxHp: num
 /** 生成随从卡牌 HTML（支持图片 + tooltip） */
 export function minionHtml(
   m: Minion,
-  opts: { hand?: boolean; selected?: boolean; zone?: string; summonIn?: boolean; side?: 'player' | 'enemy' } = {},
+  opts: { hand?: boolean; selected?: boolean; zone?: string; summonIn?: boolean; side?: 'player' | 'enemy'; draggable?: boolean } = {},
 ): string {
   const tribeChar = TRIBE_CHAR[m.tribe] ?? '?';
   const stars = '★'.repeat(m.tier);
@@ -158,10 +158,11 @@ export function minionHtml(
     opts.side ? `side-${opts.side}` : '',
   ].filter(Boolean).join(' ');
   const zoneAttr = opts.zone ? `data-zone="${opts.zone}"` : '';
+  const draggableAttr = opts.draggable ? 'draggable="true"' : '';
   // tooltip 通过 data-tooltip 属性携带，由全局 mouseover 处理显示
   const tooltipData = escapeAttr(minionTooltipHtml(m));
 
-  return `<div class="${cls}" data-uid="${m.uid}" ${zoneAttr} data-tooltip="${tooltipData}">
+  return `<div class="${cls}" data-uid="${m.uid}" ${zoneAttr} ${draggableAttr} data-tooltip="${tooltipData}">
     ${m.tripleRewardPending ? '<div class="triple-badge">奖</div>' : ''}
     <div class="card-frame">
       <div class="card-stars">${stars}</div>
@@ -211,6 +212,13 @@ export interface UIHooks {
   onRestart: () => void;
   onTripleRewardPick: (defId: string) => void;
   onHeroPick: (heroId: string) => void;
+  // ===== 拖拽专用 hooks（可选，未实现时回退到点击模式）=====
+  /** 拖拽酒馆卡牌直接到战场：一步完成购买+上场到指定位置 */
+  onDragBuyToBoard?: (tavernUid: string, boardInsertIndex: number) => void;
+  /** 拖拽手牌到战场指定插入位置 */
+  onDragPlayToSlot?: (handUid: string, boardInsertIndex: number) => void;
+  /** 战场内拖拽重排：把卡牌移动到新位置 */
+  onDragRearrangeBoard?: (boardUid: string, newInsertIndex: number) => void;
 }
 
 /** 渲染开局英雄选择面板（独立函数，不依赖 GameUI 实例） */
@@ -258,6 +266,12 @@ export class GameUI {
   root: HTMLElement;
   hooks: UIHooks;
   selection: Selection = null;
+  /** tooltip 实例引用，用于在重新渲染时强制隐藏 */
+  private tooltipEl: HTMLDivElement | null = null;
+  /** 长按计时器，用于移动端长按触发 tooltip */
+  private longPressTimer: number | null = null;
+  /** 当前长按触发 tooltip 的目标元素 */
+  private longPressTarget: HTMLElement | null = null;
 
   constructor(state: GameState, root: HTMLElement, hooks: UIHooks) {
     this.state = state;
@@ -266,46 +280,135 @@ export class GameUI {
     this.bindGlobalTooltip();
   }
 
-  /** 全局 tooltip：监听 mouseover/mouseout，根据 data-tooltip 显示浮窗 */
+  /** 全局 tooltip：PC 用 mouseover/mouseout，移动端用长按 */
   private bindGlobalTooltip(): void {
-    let tooltipEl: HTMLDivElement | null = null;
     const ensureTooltip = (): HTMLDivElement => {
-      if (!tooltipEl) {
-        tooltipEl = document.createElement('div');
-        tooltipEl.id = 'global-tooltip';
-        tooltipEl.className = 'tooltip-floating';
-        tooltipEl.style.cssText = 'position:fixed;z-index:9999;pointer-events:none;display:none;max-width:440px;';
-        document.body.appendChild(tooltipEl);
+      if (!this.tooltipEl) {
+        const t = document.createElement('div');
+        t.id = 'global-tooltip';
+        t.className = 'tooltip-floating';
+        t.style.cssText = 'position:fixed;z-index:9999;pointer-events:none;display:none;max-width:min(440px, 90vw);word-break:break-word;';
+        document.body.appendChild(t);
+        this.tooltipEl = t;
       }
-      return tooltipEl;
+      return this.tooltipEl;
     };
-    document.addEventListener('mouseover', (e) => {
-      const card = (e.target as HTMLElement).closest('[data-tooltip]') as HTMLElement | null;
-      if (!card) return;
+
+    const showTooltipFor = (card: HTMLElement): void => {
       const raw = card.getAttribute('data-tooltip');
       if (!raw) return;
       const t = ensureTooltip();
       t.innerHTML = raw.replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
       t.style.display = 'block';
       const rect = card.getBoundingClientRect();
+      // 先让 tooltip 渲染以测量尺寸
       const tw = t.offsetWidth;
       const th = t.offsetHeight;
       let left = rect.left + rect.width / 2 - tw / 2;
       let top = rect.top - th - 8;
-      if (top < 4) top = rect.bottom + 8; // 下方
+      if (top < 4) top = rect.bottom + 8; // 上方放不下放下方
       if (left < 4) left = 4;
       if (left + tw > window.innerWidth - 4) left = window.innerWidth - tw - 4;
+      // 底部也不能溢出
+      if (top + th > window.innerHeight - 4) {
+        top = Math.max(4, window.innerHeight - th - 4);
+      }
       t.style.left = left + 'px';
       t.style.top = top + 'px';
+    };
+
+    const hideTooltip = (): void => {
+      if (this.tooltipEl) this.tooltipEl.style.display = 'none';
+    };
+
+    // 重新渲染前清掉 tooltip（避免卡屏）
+    this.hideTooltip = hideTooltip;
+
+    // PC 端：鼠标悬停
+    document.addEventListener('mouseover', (e) => {
+      // 拖拽中不显示 tooltip
+      if (this.isDragging) return;
+      const card = (e.target as HTMLElement).closest('[data-tooltip]') as HTMLElement | null;
+      if (card) showTooltipFor(card);
     });
     document.addEventListener('mouseout', (e) => {
       const card = (e.target as HTMLElement).closest('[data-tooltip]');
-      if (card && tooltipEl) tooltipEl.style.display = 'none';
+      if (card) hideTooltip();
     });
+
+    // 移动端：长按 350ms 触发，移动/松手时隐藏
+    const startLongPress = (card: HTMLElement): void => {
+      this.cancelLongPress();
+      this.longPressTarget = card;
+      this.longPressTimer = window.setTimeout(() => {
+        if (this.longPressTarget === card && !this.isDragging) {
+          showTooltipFor(card);
+        }
+      }, 350);
+    };
+
+    document.addEventListener('touchstart', (e) => {
+      if (this.isDragging) return;
+      const touch = e.touches[0];
+      const target = document.elementFromPoint(touch.clientX, touch.clientY) as HTMLElement | null;
+      const card = target?.closest('[data-tooltip]') as HTMLElement | null;
+      if (card) startLongPress(card);
+    }, { passive: true });
+
+    document.addEventListener('touchmove', () => {
+      // 手指移动就取消长按（避免与拖拽冲突）
+      this.cancelLongPress();
+      hideTooltip();
+    }, { passive: true });
+
+    document.addEventListener('touchend', () => {
+      this.cancelLongPress();
+      // 长按触发的 tooltip 保留显示，直到下一次触摸或点击其他位置
+    }, { passive: true });
+
+    document.addEventListener('touchcancel', () => {
+      this.cancelLongPress();
+      hideTooltip();
+    }, { passive: true });
+
+    // 点击空白处隐藏长按 tooltip
+    document.addEventListener('click', (e) => {
+      const card = (e.target as HTMLElement).closest('[data-tooltip]');
+      if (!card) hideTooltip();
+    });
+
+    // 窗口尺寸变化时隐藏
+    window.addEventListener('resize', hideTooltip);
+    window.addEventListener('scroll', hideTooltip, true);
   }
+
+  private cancelLongPress(): void {
+    if (this.longPressTimer !== null) {
+      clearTimeout(this.longPressTimer);
+      this.longPressTimer = null;
+    }
+    this.longPressTarget = null;
+  }
+
+  /** 拖拽中标志，tooltip 系统读取它来禁用自身 */
+  private isDragging = false;
+  /** 外部设置拖拽状态 */
+  setDragging(v: boolean): void {
+    this.isDragging = v;
+    if (v) {
+      this.cancelLongPress();
+      if (this.tooltipEl) this.tooltipEl.style.display = 'none';
+    }
+  }
+
+  /** 重新渲染前调用，清掉 tooltip */
+  private hideTooltip: () => void = () => {
+    if (this.tooltipEl) this.tooltipEl.style.display = 'none';
+  };
 
   /** 渲染三连奖励三选一面板 */
   renderTripleReward(rewards: CardDef[]): void {
+    this.hideTooltip();
     const s = this.state;
     const cardsHtml = rewards.map((def) => {
       const tooltip = escapeAttr(cardDefTooltipHtml(def));
@@ -355,19 +458,25 @@ export class GameUI {
 
   /** 渲染招募阶段 - 布局：顶部英雄栏+控制 → 酒馆行 → 战场行 → 手牌悬浮底栏 */
   renderRecruit(): void {
+    this.hideTooltip();
     const s = this.state;
     const selUid =
       this.selection?.type === 'hand' || this.selection?.type === 'board'
         ? this.selection.uid
         : null;
 
-    const tavernCards = s.player.tavern.map((m) => minionHtml(m, { zone: 'tavern' })).join('');
+    const tavernCards = s.player.tavern.map((m) => minionHtml(m, { zone: 'tavern', draggable: true })).join('');
     const handCards = s.player.hand
-      .map((m) => minionHtml(m, { hand: true, selected: m.uid === selUid, zone: 'hand' }))
+      .map((m) => minionHtml(m, { hand: true, selected: m.uid === selUid, zone: 'hand', draggable: true }))
       .join('');
     const boardCards = s.player.board
-      .map((m) => minionHtml(m, { selected: m.uid === selUid, zone: 'board', side: 'player' }))
+      .map((m) => minionHtml(m, { selected: m.uid === selUid, zone: 'board', side: 'player', draggable: true }))
       .join('');
+    // 战场末尾的空槽位 + 每两张牌之间的"插入位"标记（拖拽放置点）
+    const insertSlots: string[] = [];
+    for (let i = 0; i <= s.player.board.length; i++) {
+      insertSlots.push(`<div class="board-insert-slot" data-insert-index="${i}"></div>`);
+    }
     const emptySlot = s.player.board.length < 7
       ? `<div class="board-slot drop-target" data-slot="board-${s.player.board.length}"></div>`
       : '';
@@ -448,6 +557,9 @@ export class GameUI {
 
   private bindRecruitEvents(): void {
     const root = this.root;
+    const ui = this;
+
+    // ===== 点击交互（保留作为后备）=====
     root.querySelector('#tavern-cards')?.addEventListener('click', (e) => {
       const card = (e.target as HTMLElement).closest('.card') as HTMLElement | null;
       if (card?.dataset.uid) this.hooks.onBuy(card.dataset.uid);
@@ -477,6 +589,285 @@ export class GameUI {
       toggleMute();
       this.renderRecruit();
     });
+
+    // ===== 拖拽交互（PC 用 HTML5 DnD，移动端用 touch 模拟）=====
+    this.bindDragAndDrop();
+  }
+
+  /** 拖拽系统：统一处理 PC（HTML5 DnD）和移动端（touch 模拟） */
+  private bindDragAndDrop(): void {
+    const ui = this;
+    const root = this.root;
+    const tavernZone = root.querySelector<HTMLElement>('#tavern-cards');
+    const handZone = root.querySelector<HTMLElement>('#player-hand');
+    const boardZone = root.querySelector<HTMLElement>('#player-board');
+
+    /** 拖拽数据载体 */
+    type DragPayload = { uid: string; from: 'tavern' | 'hand' | 'board' };
+    let currentDrag: DragPayload | null = null;
+    /** 拖拽预览元素（touch 用） */
+    let dragGhost: HTMLElement | null = null;
+    /** 当前高亮的 drop target */
+    let highlightedZone: HTMLElement | null = null;
+
+    const clearHighlight = (): void => {
+      if (highlightedZone) {
+        highlightedZone.classList.remove('drag-over');
+        highlightedZone = null;
+      }
+      root.querySelectorAll('.board-insert-marker').forEach((el) => el.remove());
+    };
+
+    const startDrag = (payload: DragPayload, ghostSource?: HTMLElement, clientX?: number, clientY?: number): void => {
+      currentDrag = payload;
+      ui.setDragging(true);
+      ui.cancelLongPress();
+      ui.hideTooltip();
+
+      // touch 模式下创建 ghost 跟随手指
+      if (ghostSource && clientX !== undefined && clientY !== undefined) {
+        const ghost = ghostSource.cloneNode(true) as HTMLElement;
+        ghost.classList.add('drag-ghost');
+        ghost.style.cssText = `position:fixed;z-index:99999;pointer-events:none;opacity:0.8;left:${clientX - 40}px;top:${clientY - 55}px;width:80px;height:110px;transform:scale(0.9);transition:none;`;
+        document.body.appendChild(ghost);
+        dragGhost = ghost;
+      }
+    };
+
+    const endDrag = (): void => {
+      currentDrag = null;
+      ui.setDragging(false);
+      clearHighlight();
+      if (dragGhost) {
+        dragGhost.remove();
+        dragGhost = null;
+      }
+    };
+
+    /** 根据 drop 位置计算 board index（用于插入到两张牌之间） */
+    const computeBoardInsertIndex = (clientX: number): number => {
+      if (!boardZone) return 0;
+      const cards = Array.from(boardZone.querySelectorAll<HTMLElement>('.card'));
+      if (cards.length === 0) return 0;
+      // 找到第一个中点在 clientX 右侧的卡牌，插入到它前面
+      for (let i = 0; i < cards.length; i++) {
+        const rect = cards[i].getBoundingClientRect();
+        const mid = rect.left + rect.width / 2;
+        if (clientX < mid) return i;
+      }
+      return cards.length; // 放在最末尾
+    };
+
+    /** 显示插入位置标记 */
+    const showInsertMarker = (clientX: number): void => {
+      if (!boardZone) return;
+      root.querySelectorAll('.board-insert-marker').forEach((el) => el.remove());
+      const idx = computeBoardInsertIndex(clientX);
+      const cards = Array.from(boardZone.querySelectorAll<HTMLElement>('.card'));
+      const marker = document.createElement('div');
+      marker.className = 'board-insert-marker';
+      if (idx >= cards.length) {
+        boardZone.appendChild(marker);
+      } else {
+        boardZone.insertBefore(marker, cards[idx]);
+      }
+    };
+
+    /** 执行放置动作 */
+    const performDrop = (targetZone: 'hand' | 'board', clientX: number): void => {
+      if (!currentDrag) return;
+      const { uid, from } = currentDrag;
+      if (targetZone === 'board') {
+        if (from === 'tavern') {
+          // 拖到战场 = 直接购买并上场
+          // 先调用 onBuy 把卡加入手牌（buyMinion 内部会自动 splice tavern + push hand）
+          // 然后调用 onPlayToSlot 把它放到指定位置
+          // 但这里有个时序问题：买完之后 uid 不变（同一随从），手牌里找它即可
+          // 简化：直接走现有 hooks 链——onBuy 后 ui.selection 自动设为 hand
+          // 然后我们手动调用 onPlayToSlot(insertIndex)
+          const insertIdx = computeBoardInsertIndex(clientX);
+          this.hooks.onBuy(uid);
+          // 买完后调用 onHandClick 选中该卡，再 onPlayToSlot
+          // 但 onBuy 内部已 renderRecruit，selection 被清空。直接走 onPlayToSlot 不行。
+          // 用一个新 hook：onDragBuyToBoard
+          this.hooks.onDragBuyToBoard?.(uid, insertIdx);
+        } else if (from === 'hand') {
+          const insertIdx = computeBoardInsertIndex(clientX);
+          this.hooks.onDragPlayToSlot?.(uid, insertIdx);
+        } else if (from === 'board') {
+          // 战场内重排：用 swapMinions 不够灵活，需要 move 语义
+          const insertIdx = computeBoardInsertIndex(clientX);
+          this.hooks.onDragRearrangeBoard?.(uid, insertIdx);
+        }
+      } else if (targetZone === 'hand') {
+        if (from === 'tavern') {
+          // 拖到手牌区 = 购买
+          this.hooks.onBuy(uid);
+        }
+        // hand→hand, board→hand 无意义（不卖出）
+      }
+    };
+
+    // ===== PC 端 HTML5 DnD =====
+    [tavernZone, handZone, boardZone].forEach((zone) => {
+      if (!zone) return;
+      zone.addEventListener('dragstart', (e) => {
+        const card = (e.target as HTMLElement).closest('.card') as HTMLElement | null;
+        if (!card?.dataset.uid) return;
+        const zoneName = card.dataset.zone as 'tavern' | 'hand' | 'board';
+        if (!zoneName) return;
+        const payload: DragPayload = { uid: card.dataset.uid, from: zoneName };
+        currentDrag = payload;
+        ui.setDragging(true);
+        e.dataTransfer?.setData('text/plain', card.dataset.uid);
+        if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+        // 透明拖拽预览（HTML5 默认有，但我们让它更轻量）
+      });
+      zone.addEventListener('dragend', () => {
+        endDrag();
+      });
+      zone.addEventListener('dragover', (e) => {
+        if (!currentDrag) return;
+        e.preventDefault();
+        if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+        const targetEl = e.currentTarget as HTMLElement;
+        // 只有 hand 和 board 是合法 drop 目标
+        const targetId = targetEl.id;
+        if (targetId !== 'player-hand' && targetId !== 'player-board') return;
+        // 战场牌不能拖到手牌（除非允许卖出，简化为不允许）
+        if (currentDrag.from === 'board' && targetId === 'player-hand') return;
+        if (highlightedZone !== targetEl) {
+          clearHighlight();
+          targetEl.classList.add('drag-over');
+          highlightedZone = targetEl;
+        }
+        if (targetId === 'player-board') {
+          showInsertMarker(e.clientX);
+        }
+      });
+      zone.addEventListener('dragleave', (e) => {
+        const targetEl = e.currentTarget as HTMLElement;
+        if (highlightedZone === targetEl) {
+          targetEl.classList.remove('drag-over');
+          highlightedZone = null;
+        }
+      });
+      zone.addEventListener('drop', (e) => {
+        if (!currentDrag) return;
+        e.preventDefault();
+        const targetEl = e.currentTarget as HTMLElement;
+        const targetId = targetEl.id;
+        const targetZone: 'hand' | 'board' = targetId === 'player-hand' ? 'hand' : 'board';
+        performDrop(targetZone, e.clientX);
+        endDrag();
+      });
+    });
+
+    // ===== 移动端 touch 模拟拖拽 =====
+    let touchStartX = 0, touchStartY = 0;
+    let touchMoved = false;
+    const DRAG_THRESHOLD = 8; // 移动超过 8px 才算拖拽
+
+    const onTouchStart = (e: TouchEvent): void => {
+      if (currentDrag) return;
+      const touch = e.touches[0];
+      touchStartX = touch.clientX;
+      touchStartY = touch.clientY;
+      touchMoved = false;
+      const target = document.elementFromPoint(touch.clientX, touch.clientY) as HTMLElement | null;
+      const card = target?.closest('.card') as HTMLElement | null;
+      if (!card?.dataset.uid || !card.dataset.zone) return;
+      const zoneName = card.dataset.zone as 'tavern' | 'hand' | 'board';
+      // 延迟到 touchmove 触发实际拖拽，避免误触
+      (card as any).__pendingDrag = { uid: card.dataset.uid, from: zoneName, sourceEl: card };
+    };
+
+    const onTouchMove = (e: TouchEvent): void => {
+      const touch = e.touches[0];
+      const dx = touch.clientX - touchStartX;
+      const dy = touch.clientY - touchStartY;
+      if (!touchMoved && Math.sqrt(dx * dx + dy * dy) < DRAG_THRESHOLD) return;
+      // 查找 pending drag 源
+      const pendingSource = findPendingDragSource();
+      if (!pendingSource && !currentDrag) return;
+      if (!currentDrag && pendingSource) {
+        touchMoved = true;
+        startDrag({ uid: pendingSource.uid, from: pendingSource.from }, pendingSource.sourceEl, touch.clientX, touch.clientY);
+      }
+      if (currentDrag) {
+        e.preventDefault(); // 阻止滚动
+        // 更新 ghost 位置
+        if (dragGhost) {
+          dragGhost.style.left = (touch.clientX - 40) + 'px';
+          dragGhost.style.top = (touch.clientY - 55) + 'px';
+        }
+        // 检测 drop target
+        const dropTarget = document.elementFromPoint(touch.clientX, touch.clientY) as HTMLElement | null;
+        const zone = dropTarget?.closest('#player-hand, #player-board') as HTMLElement | null;
+        clearHighlight();
+        if (zone) {
+          const zoneId = zone.id;
+          // 战场牌不能拖到手牌
+          if (currentDrag.from === 'board' && zoneId === 'player-hand') {
+            return;
+          }
+          zone.classList.add('drag-over');
+          highlightedZone = zone;
+          if (zoneId === 'player-board') {
+            showInsertMarker(touch.clientX);
+          }
+        }
+      }
+    };
+
+    const findPendingDragSource = (): { uid: string; from: 'tavern' | 'hand' | 'board'; sourceEl: HTMLElement } | null => {
+      // 扫描所有 card 找 pendingDrag（简单实现，因为只有一张卡被触摸）
+      const cards = root.querySelectorAll<HTMLElement>('.card');
+      for (const c of cards) {
+        const pd = (c as any).__pendingDrag;
+        if (pd) {
+          return { uid: pd.uid, from: pd.from, sourceEl: pd.sourceEl };
+        }
+      }
+      return null;
+    };
+
+    const onTouchEnd = (e: TouchEvent): void => {
+      // 清理 pendingDrag
+      root.querySelectorAll<HTMLElement>('.card').forEach((c) => {
+        delete (c as any).__pendingDrag;
+      });
+
+      if (currentDrag && touchMoved) {
+        // 释放时找 drop target
+        const touch = e.changedTouches[0];
+        const dropTarget = document.elementFromPoint(touch.clientX, touch.clientY) as HTMLElement | null;
+        const zone = dropTarget?.closest('#player-hand, #player-board') as HTMLElement | null;
+        if (zone) {
+          const zoneId = zone.id;
+          const targetZone: 'hand' | 'board' = zoneId === 'player-hand' ? 'hand' : 'board';
+          if (!(currentDrag.from === 'board' && targetZone === 'hand')) {
+            performDrop(targetZone, touch.clientX);
+          }
+        }
+      }
+      endDrag();
+      touchMoved = false;
+    };
+
+    const onTouchCancel = (): void => {
+      root.querySelectorAll<HTMLElement>('.card').forEach((c) => {
+        delete (c as any).__pendingDrag;
+      });
+      endDrag();
+      touchMoved = false;
+    };
+
+    // touch 监听加在 root 上（事件冒泡），passive: false 以便 preventDefault
+    root.addEventListener('touchstart', onTouchStart, { passive: true });
+    root.addEventListener('touchmove', onTouchMove, { passive: false });
+    root.addEventListener('touchend', onTouchEnd, { passive: true });
+    root.addEventListener('touchcancel', onTouchCancel, { passive: true });
   }
 
   /** 渲染战斗阶段（双方棋盘上下对峙 + 右侧日志） */
@@ -488,6 +879,7 @@ export class GameUI {
     sub: string,
     summonedUid?: string,
   ): void {
+    this.hideTooltip();
     const s = this.state;
     const eHtml = enemyBoard
       .map((m) => minionHtml(m, { side: 'enemy', summonIn: m.uid === summonedUid }))
@@ -521,6 +913,7 @@ export class GameUI {
   }
 
   renderGameOver(): void {
+    this.hideTooltip();
     const s = this.state;
     const winText = s.winner === 'player' ? '胜' : s.winner === 'enemy' ? '败' : '和';
     const sub = s.winner === 'player'
