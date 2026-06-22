@@ -9,6 +9,11 @@ function nextUid(): string {
   return `m${uidCounter}`
 }
 
+/** 重置 uid 计数器（新游戏时自动调用，也可用于测试隔离） */
+export function resetUid(): void {
+  uidCounter = 0
+}
+
 /** 从卡牌定义创建随从实例 */
 export function createMinion(def: CardDef, golden = false): Minion {
   const mult = golden ? 2 : 1
@@ -82,6 +87,8 @@ export function createPlayer(heroId: string, isAI: boolean): PlayerState {
 
 /** 创建新游戏 */
 export function createGame(playerHeroId: string, enemyHeroId: string): GameState {
+  // 重置 uid 计数器，确保每局游戏的 uid 从 m1 开始
+  resetUid()
   const player = createPlayer(playerHeroId, false)
   const enemy = createPlayer(enemyHeroId, true)
   rollTavern(player)
