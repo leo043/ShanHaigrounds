@@ -152,11 +152,11 @@ export const UPGRADE_BASE_COST: Record<number, number> = {
 /** 各酒馆等级刷新出的随从数量 */
 export const TAVERN_OFFER_COUNT: Record<number, number> = {
   1: 3,
-  2: 3,
-  3: 4,
-  4: 4,
-  5: 5,
-  6: 6,
+  2: 4,
+  3: 5,
+  4: 6,
+  5: 7,
+  6: 8,
 }
 
 /** 各酒馆等级每回合起始金币 */
