@@ -6,3 +6,4 @@ TEAM_TECH_AUDIT.md
 /.build-tmp
 *.log
 .nezha/config.toml
+.mimocode/plans/*
