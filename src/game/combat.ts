@@ -94,52 +94,44 @@ export function simulateCombat(state: GameState): CombatResult {
   // 法师羁绊效果
   for (const syn of playerSynergies) {
     if (syn.tag === 'mage' && syn.activeLevel >= 1 && eBoard.length > 0) {
-      // Level 1: 对随机敌方造成 2 伤害
-      const target = eBoard[Math.floor(Math.random() * eBoard.length)]
-      if (target.divineShield) {
-        target.divineShield = false
-        steps.push({
-          type: 'shield',
-          side: 'enemy',
-          defenderUid: target.uid,
-          snap: snap(),
-          text: `【法师羁绊】战斗开始伤害被【${target.name}】圣盾抵挡`,
-        })
-      } else {
-        damageMinion(target, 2)
-        steps.push({
-          type: 'hit',
-          side: 'player',
-          defenderUid: target.uid,
-          damage: 2,
-          snap: snap(),
-          text: `【法师羁绊】战斗开始对【${target.name}】造成 2 点伤害`,
-        })
+      // Level 1: 全体敌方各 1 伤害
+      for (const enemy of eBoard) {
+        if (enemy.health <= 0) continue
+        if (enemy.divineShield) {
+          enemy.divineShield = false
+          steps.push({
+            type: 'shield',
+            side: 'enemy',
+            defenderUid: enemy.uid,
+            snap: snap(),
+            text: `【法师羁绊】伤害被【${enemy.name}】圣盾抵挡`,
+          })
+        } else {
+          damageMinion(enemy, 1)
+          steps.push({
+            type: 'hit',
+            side: 'player',
+            defenderUid: enemy.uid,
+            damage: 1,
+            snap: snap(),
+            text: `【法师羁绊】对【${enemy.name}】造成 1 点伤害`,
+          })
+        }
       }
-      // Level 2: 全体敌方各 1 伤害
+      // Level 2: 随机消灭一个敌人
       if (syn.activeLevel >= 2) {
-        for (const enemy of eBoard) {
-          if (enemy.health <= 0) continue
-          if (enemy.divineShield) {
-            enemy.divineShield = false
-            steps.push({
-              type: 'shield',
-              side: 'enemy',
-              defenderUid: enemy.uid,
-              snap: snap(),
-              text: `【法师羁绊 Lv.2】伤害被【${enemy.name}】圣盾抵挡`,
-            })
-          } else {
-            damageMinion(enemy, 1)
-            steps.push({
-              type: 'hit',
-              side: 'player',
-              defenderUid: enemy.uid,
-              damage: 1,
-              snap: snap(),
-              text: `【法师羁绊 Lv.2】对【${enemy.name}】造成 1 点伤害`,
-            })
-          }
+        const alive = eBoard.filter((m) => m.health > 0)
+        if (alive.length > 0) {
+          const victim = alive[Math.floor(Math.random() * alive.length)]
+          victim.health = 0
+          steps.push({
+            type: 'hit',
+            side: 'player',
+            defenderUid: victim.uid,
+            damage: 999,
+            snap: snap(),
+            text: `【法师羁绊 Lv.2】随机消灭【${victim.name}】`,
+          })
         }
       }
     }
@@ -148,50 +140,44 @@ export function simulateCombat(state: GameState): CombatResult {
   // 敌方法师羁绊
   for (const syn of enemySynergies) {
     if (syn.tag === 'mage' && syn.activeLevel >= 1 && pBoard.length > 0) {
-      const target = pBoard[Math.floor(Math.random() * pBoard.length)]
-      if (target.divineShield) {
-        target.divineShield = false
-        steps.push({
-          type: 'shield',
-          side: 'player',
-          defenderUid: target.uid,
-          snap: snap(),
-          text: `【敌方法师羁绊】战斗开始伤害被【${target.name}】圣盾抵挡`,
-        })
-      } else {
-        damageMinion(target, 2)
-        steps.push({
-          type: 'hit',
-          side: 'enemy',
-          defenderUid: target.uid,
-          damage: 2,
-          snap: snap(),
-          text: `【敌方法师羁绊】战斗开始对【${target.name}】造成 2 点伤害`,
-        })
+      // Level 1: 全体敌方各 1 伤害
+      for (const ally of pBoard) {
+        if (ally.health <= 0) continue
+        if (ally.divineShield) {
+          ally.divineShield = false
+          steps.push({
+            type: 'shield',
+            side: 'player',
+            defenderUid: ally.uid,
+            snap: snap(),
+            text: `【敌方法师羁绊】伤害被【${ally.name}】圣盾抵挡`,
+          })
+        } else {
+          damageMinion(ally, 1)
+          steps.push({
+            type: 'hit',
+            side: 'enemy',
+            defenderUid: ally.uid,
+            damage: 1,
+            snap: snap(),
+            text: `【敌方法师羁绊】对【${ally.name}】造成 1 点伤害`,
+          })
+        }
       }
+      // Level 2: 随机消灭一个敌人
       if (syn.activeLevel >= 2) {
-        for (const ally of pBoard) {
-          if (ally.health <= 0) continue
-          if (ally.divineShield) {
-            ally.divineShield = false
-            steps.push({
-              type: 'shield',
-              side: 'player',
-              defenderUid: ally.uid,
-              snap: snap(),
-              text: `【敌方法师羁绊 Lv.2】伤害被【${ally.name}】圣盾抵挡`,
-            })
-          } else {
-            damageMinion(ally, 1)
-            steps.push({
-              type: 'hit',
-              side: 'enemy',
-              defenderUid: ally.uid,
-              damage: 1,
-              snap: snap(),
-              text: `【敌方法师羁绊 Lv.2】对【${ally.name}】造成 1 点伤害`,
-            })
-          }
+        const alive = pBoard.filter((m) => m.health > 0)
+        if (alive.length > 0) {
+          const victim = alive[Math.floor(Math.random() * alive.length)]
+          victim.health = 0
+          steps.push({
+            type: 'hit',
+            side: 'enemy',
+            defenderUid: victim.uid,
+            damage: 999,
+            snap: snap(),
+            text: `【敌方法师羁绊 Lv.2】随机消灭【${victim.name}】`,
+          })
         }
       }
     }

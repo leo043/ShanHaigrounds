@@ -130,22 +130,30 @@ export function applyTribeSynergyBuffs(board: Minion[]): void {
 
     // Level 3: +2/+2 + special (on top of level 2)
     if (syn.activeLevel >= 3) {
-      for (const m of board) {
-        if (m.tribe === tribe) {
-          m.attack += 2
-          m.health += 2
-          m.maxHealth += 2
-          m.synergyBuffAttack += 2
-          m.synergyBuffHealth += 2
-          m.synergyBuffMaxHealth += 2
-        }
-      }
-      // Human level 3: add taunt
       if (tribe === 'human') {
+        // Human level 3: attack doubled, health halved
         for (const m of board) {
-          if (m.tribe === 'human' && !m.keywords.includes('taunt')) {
-            m.keywords.push('taunt')
-            m.synergyAddedKeywords.push('taunt')
+          if (m.tribe === 'human') {
+            const atkBonus = m.attack
+            const newHp = Math.max(1, Math.ceil(m.health / 2))
+            const hpBonus = newHp - m.health
+            m.attack += atkBonus
+            m.health += hpBonus
+            m.maxHealth += hpBonus
+            m.synergyBuffAttack += atkBonus
+            m.synergyBuffHealth += hpBonus
+            m.synergyBuffMaxHealth += hpBonus
+          }
+        }
+      } else {
+        for (const m of board) {
+          if (m.tribe === tribe) {
+            m.attack += 2
+            m.health += 2
+            m.maxHealth += 2
+            m.synergyBuffAttack += 2
+            m.synergyBuffHealth += 2
+            m.synergyBuffMaxHealth += 2
           }
         }
       }
@@ -155,6 +163,14 @@ export function applyTribeSynergyBuffs(board: Minion[]): void {
           if (m.tribe === 'demon' && !m.keywords.includes('reborn')) {
             m.keywords.push('reborn')
             m.synergyAddedKeywords.push('reborn')
+          }
+        }
+      }
+      // Spirit level 3: grant divine shield
+      if (tribe === 'spirit') {
+        for (const m of board) {
+          if (m.tribe === 'spirit') {
+            m.divineShield = true
           }
         }
       }
