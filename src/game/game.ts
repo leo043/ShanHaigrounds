@@ -136,7 +136,7 @@ export function buyMinion(player: PlayerState, tavernIndex: number): void {
   checkTriple(player)
 }
 
-/** 卖出随从（+1 金币，上限 maxGold） */
+/** 卖出随从（+1 金币，不超过 maxGold） */
 export function sellMinion(player: PlayerState, boardIndex: number): boolean {
   if (boardIndex < 0 || boardIndex >= player.board.length) return false
   player.board.splice(boardIndex, 1)

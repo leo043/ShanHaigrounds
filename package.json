@@ -15,7 +15,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "prepare": "husky"
+    "prepare": "husky",
+    "server": "cd server && npm run dev"
   },
   "lint-staged": {
     "src/**/*.ts": [

@@ -54,11 +54,11 @@ describe('createMinion', () => {
   })
 
   it('金卡效果数值应翻倍', () => {
-    // 蛇魅：亡语召唤小蛇 1/1，金卡应为 2/2
+    // 蛇魅：亡语召唤小蛇 1/2，金卡应为 2/4
     const golden = m('demon_snake', true)
     const summon = golden.effects[0]?.summon
     expect(summon?.attack).toBe(2)
-    expect(summon?.health).toBe(2)
+    expect(summon?.health).toBe(4)
   })
 
   it('金卡关键词不翻倍（保持原样）', () => {

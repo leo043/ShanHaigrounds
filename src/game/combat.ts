@@ -2,6 +2,23 @@
 import type { GameState, Minion } from './types'
 import { createSummonMinion, damageMinion } from './game'
 
+/** 战斗中的 buff 辅助函数（与 game.ts 的 buffMinion 逻辑一致） */
+function combatBuff(m: Minion, atk?: number, hp?: number): void {
+  if (atk) m.attack += atk
+  if (hp) {
+    m.health += hp
+    m.maxHealth += hp
+  }
+}
+
+/** 生成 buff 描述文本 */
+function buffDesc(atk?: number, hp?: number): string {
+  if (atk && hp) return `+${atk}/+${hp}`
+  if (atk) return `+${atk} 攻击`
+  if (hp) return `+${hp} 血量`
+  return ''
+}
+
 export type Side = 'player' | 'enemy'
 
 /** 战斗步骤（每步带双方棋盘快照，供 UI 回放） */
@@ -76,6 +93,7 @@ export function simulateCombat(state: GameState): CombatResult {
     for (const m of board) {
       for (const e of m.effects) {
         if (e.trigger !== 'combatStart') continue
+        // 伤害类效果
         if (e.target === 'damageRandomEnemy' && e.damage && enemy.length > 0) {
           const t = enemy[Math.floor(Math.random() * enemy.length)]
           if (t.divineShield) {
@@ -98,6 +116,66 @@ export function simulateCombat(state: GameState): CombatResult {
               text: `【${m.name}】战斗开始对【${t.name}】造成 ${e.damage} 点伤害`,
             })
           }
+        }
+        // buff 类效果
+        else if (e.target === 'allAlliesOfTribe' && e.tribe) {
+          const tribeName = e.tribe === 'human' ? '人族' : e.tribe === 'demon' ? '妖族' : '仙族'
+          const buffedNames: string[] = []
+          for (const ally of board) {
+            if (ally.tribe === e.tribe) {
+              combatBuff(ally, e.buffAttack, e.buffHealth)
+              buffedNames.push(ally.name)
+            }
+          }
+          if (buffedNames.length > 0) {
+            steps.push({
+              type: 'info',
+              side,
+              snap: snap(),
+              text: `【${m.name}】战斗开始：${tribeName}友方${buffDesc(e.buffAttack, e.buffHealth)}（${buffedNames.join('、')}）`,
+            })
+          }
+        } else if (e.target === 'allAllies') {
+          const buffedNames: string[] = []
+          for (const ally of board) {
+            combatBuff(ally, e.buffAttack, e.buffHealth)
+            buffedNames.push(ally.name)
+          }
+          if (buffedNames.length > 0) {
+            steps.push({
+              type: 'info',
+              side,
+              snap: snap(),
+              text: `【${m.name}】战斗开始：全体友方${buffDesc(e.buffAttack, e.buffHealth)}（${buffedNames.join('、')}）`,
+            })
+          }
+        } else if (e.target === 'adjacent') {
+          const idx = board.indexOf(m)
+          const buffedNames: string[] = []
+          if (idx > 0) {
+            combatBuff(board[idx - 1], e.buffAttack, e.buffHealth)
+            buffedNames.push(board[idx - 1].name)
+          }
+          if (idx >= 0 && idx < board.length - 1) {
+            combatBuff(board[idx + 1], e.buffAttack, e.buffHealth)
+            buffedNames.push(board[idx + 1].name)
+          }
+          if (buffedNames.length > 0) {
+            steps.push({
+              type: 'info',
+              side,
+              snap: snap(),
+              text: `【${m.name}】战斗开始：相邻友方${buffDesc(e.buffAttack, e.buffHealth)}（${buffedNames.join('、')}）`,
+            })
+          }
+        } else if (e.target === 'self') {
+          combatBuff(m, e.buffAttack, e.buffHealth)
+          steps.push({
+            type: 'info',
+            side,
+            snap: snap(),
+            text: `【${m.name}】战斗开始：自身${buffDesc(e.buffAttack, e.buffHealth)}`,
+          })
         }
       }
     }

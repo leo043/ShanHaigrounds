@@ -41,7 +41,7 @@ export const CARDS: CardDef[] = [
     tier: 2,
     attack: 2,
     health: 3,
-    effects: [{ trigger: 'endOfTurn', target: 'self', buffAttack: 1, buffHealth: 1 }],
+    effects: [{ trigger: 'endOfTurn', target: 'adjacent', buffAttack: 1, buffHealth: 1 }],
     flavor: '一禅一棍，日进寸功。',
   },
   {
@@ -60,7 +60,7 @@ export const CARDS: CardDef[] = [
     tribe: 'human',
     tier: 4,
     attack: 4,
-    health: 3,
+    health: 4,
     keywords: ['reborn'],
     flavor: '剑心不灭，肉身重生。',
   },
@@ -86,7 +86,7 @@ export const CARDS: CardDef[] = [
       {
         trigger: 'deathrattle',
         target: 'summonMinion',
-        summon: { name: '小蛇', attack: 1, health: 1, tribe: 'demon' },
+        summon: { name: '小蛇', attack: 1, health: 2, tribe: 'demon' },
       },
     ],
     flavor: '化形未全，毒牙已利。',
@@ -112,7 +112,7 @@ export const CARDS: CardDef[] = [
       {
         trigger: 'battlecry',
         target: 'summonMinion',
-        summon: { name: '蛛仔', attack: 1, health: 1, tribe: 'demon' },
+        summon: { name: '蛛仔', attack: 1, health: 2, tribe: 'demon' },
       },
     ],
     flavor: '吐丝成阵，困敌于网。',
@@ -140,7 +140,7 @@ export const CARDS: CardDef[] = [
     name: '平天牛魔',
     tribe: 'demon',
     tier: 4,
-    attack: 6,
+    attack: 5,
     health: 5,
     keywords: ['taunt'],
     effects: [
@@ -199,6 +199,7 @@ export const CARDS: CardDef[] = [
     tier: 3,
     attack: 3,
     health: 3,
+    keywords: ['divineShield'],
     effects: [{ trigger: 'combatStart', target: 'damageRandomEnemy', damage: 2 }],
     flavor: '雷霆万钧，邪祟辟易。',
   },
@@ -209,7 +210,7 @@ export const CARDS: CardDef[] = [
     tier: 4,
     attack: 5,
     health: 4,
-    effects: [{ trigger: 'startOfTurn', target: 'self', buffAttack: 1, buffHealth: 1 }],
+    effects: [{ trigger: 'startOfTurn', target: 'self', buffAttack: 5, buffHealth: 5 }],
     flavor: '三眼洞明，斩妖除魔。',
   },
   {
@@ -229,7 +230,7 @@ export const CARDS: CardDef[] = [
     tier: 5,
     attack: 7,
     health: 7,
-    effects: [{ trigger: 'endOfTurn', target: 'allAllies', buffAttack: 1, buffHealth: 1 }],
+    effects: [{ trigger: 'endOfTurn', target: 'allAllies', buffAttack: 2, buffHealth: 2 }],
     flavor: '道生万物，德被苍生。',
   },
   {
@@ -243,9 +244,19 @@ export const CARDS: CardDef[] = [
     flavor: '九天降世，赐盾众生。',
   },
 
-  // ============ 第八轮扩卡：补足每族每星级至少 2 张 ============
+  // ============ 第八轮扩卡：补足每族每星级至少 2 张 + 阵营联动 ============
 
   // --- 人族补 ---
+  {
+    id: 'human_drummer',
+    name: '擂鼓先锋',
+    tribe: 'human',
+    tier: 2,
+    attack: 2,
+    health: 2,
+    effects: [{ trigger: 'endOfTurn', target: 'allAlliesOfTribe', tribe: 'human', buffAttack: 1 }],
+    flavor: '擂鼓震天，三军奋勇。',
+  },
   {
     id: 'human_baima',
     name: '白马义从',
@@ -253,7 +264,7 @@ export const CARDS: CardDef[] = [
     tier: 3,
     attack: 3,
     health: 3,
-    keywords: ['windfury'],
+    keywords: ['windfury', 'divineShield'],
     flavor: '白马银枪，来往如风。',
   },
   {
@@ -278,6 +289,18 @@ export const CARDS: CardDef[] = [
   },
 
   // --- 妖族补 ---
+  {
+    id: 'demon_bat',
+    name: '噬魂蝠',
+    tribe: 'demon',
+    tier: 3,
+    attack: 2,
+    health: 2,
+    effects: [
+      { trigger: 'combatStart', target: 'allAlliesOfTribe', tribe: 'demon', buffAttack: 1 },
+    ],
+    flavor: '吸食魂魄，振翅间妖气大盛。',
+  },
   {
     id: 'demon_goblin',
     name: '小妖兵',
@@ -304,7 +327,7 @@ export const CARDS: CardDef[] = [
     tribe: 'demon',
     tier: 3,
     attack: 4,
-    health: 2,
+    health: 3,
     keywords: ['windfury'],
     flavor: '黄风一卷，飞沙走石。',
   },
@@ -320,7 +343,7 @@ export const CARDS: CardDef[] = [
       {
         trigger: 'deathrattle',
         target: 'summonMinion',
-        summon: { name: '蛮牛', attack: 5, health: 5, tribe: 'demon' },
+        summon: { name: '蛮牛', attack: 4, health: 4, tribe: 'demon' },
       },
     ],
     flavor: '平天大圣，力压群妖，亡亦留威。',
@@ -334,7 +357,7 @@ export const CARDS: CardDef[] = [
     tier: 1,
     attack: 1,
     health: 2,
-    effects: [{ trigger: 'battlecry', target: 'self', buffAttack: 1, buffHealth: 1 }],
+    effects: [{ trigger: 'battlecry', target: 'allAlliesOfTribe', tribe: 'spirit', buffHealth: 1 }],
     flavor: '广寒捣药，灵性十足。',
   },
   {
@@ -354,7 +377,15 @@ export const CARDS: CardDef[] = [
     tier: 4,
     attack: 4,
     health: 5,
-    effects: [{ trigger: 'battlecry', target: 'allAllies', buffHealth: 1 }],
+    effects: [
+      {
+        trigger: 'battlecry',
+        target: 'allAlliesOfTribe',
+        tribe: 'spirit',
+        buffAttack: 1,
+        buffHealth: 1,
+      },
+    ],
     flavor: '寿同南山，福泽众生。',
   },
 ]

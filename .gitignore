@@ -1,5 +1,6 @@
 /.workbuddy
 /node_modules
+**/node_modules
 /overview.md
 TEAM_TECH_AUDIT.md
 /dist

@@ -150,8 +150,8 @@ describe('simulateCombat', () => {
   })
 
   it('金卡亡语召唤物属性应翻倍', () => {
-    // 金卡蛇魅 4/6(亡语召唤小蛇，金卡翻倍→小蛇 2/2) vs 牛魔王 7/7(嘲讽)
-    // 蛇魅死亡后亡语召唤的小蛇应是 2/2（金卡效果强化）
+    // 金卡蛇魅 4/6(亡语召唤小蛇，金卡翻倍→小蛇 2/4) vs 牛魔王 7/7(嘲讽)
+    // 蛇魅死亡后亡语召唤的小蛇应是 2/4（金卡效果强化）
     const goldenSnake = m('demon_snake', true)
     const result = simulateCombat(makeState([goldenSnake], [m('demon_niutou')]))
     // 找到召唤步骤
@@ -161,7 +161,7 @@ describe('simulateCombat', () => {
     const summoned = summonStep?.snap.p.find((mm) => mm.name === '小蛇')
     expect(summoned).toBeDefined()
     expect(summoned?.attack).toBe(2)
-    expect(summoned?.health).toBe(2)
+    expect(summoned?.health).toBe(4)
   })
 
   // ========== 战斗后状态恢复 ==========

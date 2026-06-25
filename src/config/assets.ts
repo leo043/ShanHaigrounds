@@ -13,7 +13,7 @@ export const MINION_IMAGES: Record<string, string> = {
   human_baima: '/images/minions/human_baima.png',
   human_huben: '/images/minions/human_huben.png',
   human_guanyu: '/images/minions/human_guanyu.png',
-  // 妖族
+  human_drummer: '/images/minions/human_drummer.png',
   demon_imp: '/images/minions/demon_imp.png',
   demon_snake: '/images/minions/demon_snake.png',
   demon_bear: '/images/minions/demon_bear.png',
@@ -25,6 +25,7 @@ export const MINION_IMAGES: Record<string, string> = {
   demon_centipede: '/images/minions/demon_centipede.png',
   demon_huangfeng: '/images/minions/demon_huangfeng.png',
   demon_niutou: '/images/minions/demon_niutou.png',
+  demon_bat: '/images/minions/demon_bat.png',
   // 仙族
   spirit_child: '/images/minions/spirit_child.png',
   spirit_crane: '/images/minions/spirit_crane.png',

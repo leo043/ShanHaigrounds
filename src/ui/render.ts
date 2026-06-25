@@ -91,11 +91,10 @@ export function renderMainMenu(
           <div class="menu-card-title">随从图鉴</div>
           <div class="menu-card-desc">浏览所有随从卡牌，了解技能详情</div>
         </div>
-        <div class="main-menu-card disabled" data-action="room">
-          <div class="menu-card-badge">敬请期待</div>
+        <div class="main-menu-card" data-action="room">
           <div class="menu-card-icon">🏠</div>
           <div class="menu-card-title">创建房间</div>
-          <div class="menu-card-desc">与好友对战，更多玩法即将上线</div>
+          <div class="menu-card-desc">与好友在线对战</div>
         </div>
       </div>
     </div>
@@ -526,5 +525,41 @@ export class GameUI {
       </div>
     `
     this.root.querySelector('#btn-restart')?.addEventListener('click', () => this.hooks.onRestart())
+  }
+
+  /** 显示倒计时（多人模式招募阶段） */
+  showCountdown(seconds: number): void {
+    const turnInfo = this.root.querySelector('.turn-info')
+    if (turnInfo) {
+      const badge = document.createElement('span')
+      badge.className = 'mp-countdown-badge'
+      badge.id = 'mp-countdown'
+      badge.textContent = `⏱ ${seconds}s`
+      turnInfo.appendChild(badge)
+    }
+    // 隐藏开战按钮
+    const combatBtn = this.root.querySelector('#btn-combat') as HTMLElement | null
+    if (combatBtn) combatBtn.style.display = 'none'
+  }
+
+  /** 更新倒计时数字 */
+  updateCountdown(seconds: number): void {
+    const badge = this.root.querySelector('#mp-countdown')
+    if (badge) badge.textContent = `⏱ ${seconds}s`
+  }
+
+  /** 显示等待对手（倒计时结束后） */
+  showWaitingForOpponent(): void {
+    const badge = this.root.querySelector('#mp-countdown')
+    if (badge) {
+      badge.textContent = '等待对手...'
+      badge.classList.add('waiting')
+    }
+    // 禁用所有操作按钮
+    const buttons = this.root.querySelectorAll('.ctrl-btn') as NodeListOf<HTMLElement>
+    for (const btn of buttons) {
+      btn.style.pointerEvents = 'none'
+      btn.style.opacity = '0.5'
+    }
   }
 }
