@@ -40,7 +40,7 @@ export const CLASS_SYNERGY_LEVELS: Record<Class, number[]> = {
 /** 种族羁绊效果描述 */
 export const TRIBE_SYNERGY_DESC: Record<Tribe, string[]> = {
   human: ['全体人族 +1 攻击', '全体人族 +1/+1', '人定胜天：全体人族攻击翻倍但生命减半'],
-  demon: ['全体妖族 +1 生命', '全体妖族 +1/+1', '至死方休：全体妖族 +2/+2 且获得复生'],
+  demon: ['全体妖族 +1 生命', '全体妖族 +1/+1', '魑魅魍魉：全体妖族 +2/+2 且获得复生'],
   spirit: ['全体仙族 +1 攻击', '全体仙族 +1/+1', '仙风道骨：全体仙族获得圣盾'],
 }
 
