@@ -273,11 +273,17 @@ export function checkTriple(player: PlayerState): void {
     const group = groups[defId]
     if (group.length >= 3) {
       const [a, b, c] = group
+      // 累加三张卡的当前属性（含之前羁绊/buff 加成）
+      const totalAtk = a.attack + b.attack + c.attack
+      const totalHp = a.health + b.health + c.health
       removeFromPlayer(player, a.uid)
       removeFromPlayer(player, b.uid)
       removeFromPlayer(player, c.uid)
       const def = CARD_MAP[defId]
       const golden = createMinion(def, true)
+      golden.attack = totalAtk
+      golden.health = totalHp
+      golden.maxHealth = totalHp
       golden.tripleRewardPending = true // 标记：打出时触发三选一奖励
       player.hand.push(golden)
       return
