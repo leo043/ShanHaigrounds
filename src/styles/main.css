@@ -2054,6 +2054,114 @@ body {
   opacity: 0.8;
 }
 
+/* 羁绊效果一览弹窗 */
+.codex-synergy-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.codex-synergy-mask {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(2px);
+}
+.codex-synergy-panel {
+  position: relative;
+  background: var(--bg-dark);
+  border: 1px solid var(--gold-dim);
+  border-radius: 12px;
+  padding: 24px 28px;
+  max-width: 520px;
+  width: 90vw;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+}
+.syn-ref-title {
+  font-family: var(--font-serif);
+  font-size: 20px;
+  color: var(--gold-light);
+  text-align: center;
+  margin-bottom: 16px;
+  letter-spacing: 2px;
+}
+.syn-ref-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.syn-ref-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.syn-ref-section-title {
+  font-family: var(--font-serif);
+  font-size: 15px;
+  font-weight: bold;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(201, 161, 74, 0.3);
+  margin-bottom: 4px;
+}
+.syn-ref-section-title.tribe-color {
+  color: var(--gold-light);
+  border-color: var(--gold-light);
+}
+.syn-ref-section-title.class-color {
+  color: var(--vermilion);
+  border-color: var(--vermilion);
+}
+.syn-ref-group {
+  padding-left: 8px;
+}
+.syn-ref-name {
+  font-size: 14px;
+  font-weight: bold;
+  margin-bottom: 4px;
+}
+.syn-ref-name.tribe-color {
+  color: var(--gold-light);
+}
+.syn-ref-name.class-color {
+  color: var(--vermilion);
+}
+.syn-ref-level {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 2px 0 2px 12px;
+  font-size: 13px;
+  color: #ccc;
+}
+.syn-ref-threshold {
+  color: var(--gold-dim);
+  font-size: 12px;
+  min-width: 32px;
+  flex-shrink: 0;
+}
+.syn-ref-desc {
+  color: #ddd;
+}
+.syn-ref-close {
+  display: block;
+  margin: 16px auto 0;
+  padding: 6px 24px;
+  background: rgba(201, 161, 74, 0.15);
+  border: 1px solid var(--gold-dim);
+  border-radius: 6px;
+  color: var(--gold-light);
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.syn-ref-close:hover {
+  background: rgba(201, 161, 74, 0.35);
+}
+
 /* ============ 多人对战 UI ============ */
 
 .room-select-overlay {

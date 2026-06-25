@@ -5,7 +5,12 @@ import { toggleMute, isMuted } from '../game/audio'
 import { HERO_IMAGES } from '../config/assets'
 import { minionHtml, heroHtml, codexCardHtml, rewardCardHtml } from './cards'
 import { calculateSynergies, getTribeName, getClassName } from '../game/synergy'
-import { TRIBE_SYNERGY_DESC, CLASS_SYNERGY_DESC } from '../game/types'
+import {
+  TRIBE_SYNERGY_DESC,
+  CLASS_SYNERGY_DESC,
+  TRIBE_SYNERGY_LEVELS,
+  CLASS_SYNERGY_LEVELS,
+} from '../game/types'
 import { escapeAttr, minionTooltipHtml } from './tooltip'
 
 export type Selection = { type: 'hand'; uid: string } | { type: 'board'; uid: string } | null
@@ -226,6 +231,7 @@ export function renderCodex(root: HTMLElement, onBack: () => void): void {
       <div class="codex-topbar">
         <div class="codex-back" id="codex-back">←</div>
         <div class="codex-title">随从图鉴</div>
+        <button class="codex-filter-tag" id="codex-synergy-ref" style="background:rgba(201,161,74,0.25);color:#c9a14a;border-color:#c9a14a">查看羁绊</button>
         <span class="codex-count">${CARDS.length} / ${CARDS.length}</span>
         <div class="codex-filters">
           <button class="codex-filter-tag" id="codex-filter-tribe">种族</button>
@@ -253,6 +259,74 @@ export function renderCodex(root: HTMLElement, onBack: () => void): void {
     showPicker('选择星级', tierOptions, filterTier, (k) => {
       filterTier = k as string
     })
+  })
+
+  // 羁绊效果一览弹窗
+  root.querySelector('#codex-synergy-ref')?.addEventListener('click', () => {
+    root.querySelector('.codex-synergy-overlay')?.remove()
+
+    function buildRows(
+      entries: { name: string; descs: string[]; thresholds: number[] }[],
+      colorClass: string,
+    ): string {
+      return entries
+        .map(({ name, descs, thresholds }) => {
+          const levels = descs
+            .map(
+              (d, i) =>
+                `<div class="syn-ref-level"><span class="syn-ref-threshold">${thresholds[i]}个</span><span class="syn-ref-desc">${d}</span></div>`,
+            )
+            .join('')
+          return `<div class="syn-ref-group"><div class="syn-ref-name ${colorClass}">${name}</div>${levels}</div>`
+        })
+        .join('')
+    }
+
+    const tribeRows = buildRows(
+      [
+        { name: '人族', descs: TRIBE_SYNERGY_DESC.human, thresholds: TRIBE_SYNERGY_LEVELS.human },
+        { name: '妖族', descs: TRIBE_SYNERGY_DESC.demon, thresholds: TRIBE_SYNERGY_LEVELS.demon },
+        { name: '仙族', descs: TRIBE_SYNERGY_DESC.spirit, thresholds: TRIBE_SYNERGY_LEVELS.spirit },
+      ],
+      'tribe-color',
+    )
+
+    const classRows = buildRows(
+      [
+        {
+          name: '武将',
+          descs: CLASS_SYNERGY_DESC.warrior,
+          thresholds: CLASS_SYNERGY_LEVELS.warrior,
+        },
+        {
+          name: '刺客',
+          descs: CLASS_SYNERGY_DESC.assassin,
+          thresholds: CLASS_SYNERGY_LEVELS.assassin,
+        },
+        { name: '法师', descs: CLASS_SYNERGY_DESC.mage, thresholds: CLASS_SYNERGY_LEVELS.mage },
+        { name: '射手', descs: CLASS_SYNERGY_DESC.archer, thresholds: CLASS_SYNERGY_LEVELS.archer },
+        { name: '祭司', descs: CLASS_SYNERGY_DESC.priest, thresholds: CLASS_SYNERGY_LEVELS.priest },
+        { name: '巫祝', descs: CLASS_SYNERGY_DESC.shaman, thresholds: CLASS_SYNERGY_LEVELS.shaman },
+      ],
+      'class-color',
+    )
+
+    const overlay = document.createElement('div')
+    overlay.className = 'codex-synergy-overlay'
+    overlay.innerHTML = `
+      <div class="codex-synergy-mask"></div>
+      <div class="codex-synergy-panel">
+        <div class="syn-ref-title">羁绊效果一览</div>
+        <div class="syn-ref-body">
+          <div class="syn-ref-section"><div class="syn-ref-section-title tribe-color">种族羁绊</div>${tribeRows}</div>
+          <div class="syn-ref-section"><div class="syn-ref-section-title class-color">职业羁绊</div>${classRows}</div>
+        </div>
+        <button class="syn-ref-close" id="syn-ref-close">关闭</button>
+      </div>
+    `
+    root.appendChild(overlay)
+    overlay.querySelector('.codex-synergy-mask')?.addEventListener('click', () => overlay.remove())
+    overlay.querySelector('#syn-ref-close')?.addEventListener('click', () => overlay.remove())
   })
 
   renderCards()
