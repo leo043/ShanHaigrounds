@@ -2,6 +2,7 @@
 import type { GameState, PlayerState, Minion, CardDef, Tribe, Effect } from './types'
 import { CARDS, CARD_MAP, HEROES, getSummonDef } from './cards'
 import { TIER_MAX_BY_TAVERN, UPGRADE_BASE_COST, TAVERN_OFFER_COUNT, goldForTurn } from './types'
+import { recalcSynergyAuras } from './synergy'
 
 let uidCounter = 0
 function nextUid(): string {
@@ -24,6 +25,7 @@ export function createMinion(def: CardDef, golden = false): Minion {
     defId: def.id,
     name: def.name,
     tribe: def.tribe,
+    class: def.class,
     tier: def.tier,
     attack: atk,
     health: hp,
@@ -34,6 +36,10 @@ export function createMinion(def: CardDef, golden = false): Minion {
     golden,
     divineShield: def.keywords?.includes('divineShield') ?? false,
     hasAttacked: false,
+    synergyBuffAttack: 0,
+    synergyBuffHealth: 0,
+    synergyBuffMaxHealth: 0,
+    synergyAddedKeywords: [],
   }
 }
 
@@ -140,7 +146,9 @@ export function buyMinion(player: PlayerState, tavernIndex: number): void {
 export function sellMinion(player: PlayerState, boardIndex: number): boolean {
   if (boardIndex < 0 || boardIndex >= player.board.length) return false
   player.board.splice(boardIndex, 1)
-  player.gold += 1
+  player.gold = Math.min(player.gold + 1, player.maxGold)
+  // 战场变化后重算羁绊光环
+  recalcSynergyAuras(player.board)
   return true
 }
 
@@ -164,6 +172,8 @@ export function playMinion(player: PlayerState, handIndex: number, boardIndex: n
   player.board.splice(insertAt, 0, minion)
   // 触发战吼
   triggerBattlecry(player, minion)
+  // 战场变化后重算羁绊光环
+  recalcSynergyAuras(player.board)
   // 检查三连合成（打出过程中可能触发新的三连，合成后的金卡加入手牌）
   checkTriple(player)
   // 关键：三连奖励在打出金卡时触发（而不是合成瞬间）
@@ -363,6 +373,8 @@ export function startTurn(state: GameState): void {
     }
     // 触发回合开始效果
     triggerStartOfTurn(p)
+    // 回合开始效果可能召唤新随从，需要重算羁绊光环
+    recalcSynergyAuras(p.board)
     // 刷新酒馆
     rollTavern(p)
   }
@@ -383,7 +395,10 @@ function triggerStartOfTurn(player: PlayerState): void {
 /** 结束招募阶段：触发回合结束效果 */
 export function endRecruitPhase(state: GameState): void {
   for (const p of [state.player, state.enemy]) {
+    // 触发回合结束效果
     triggerEndOfTurn(p)
+    // 回合结束效果可能召唤新随从，需要重算羁绊光环
+    recalcSynergyAuras(p.board)
   }
   state.phase = 'combat'
 }

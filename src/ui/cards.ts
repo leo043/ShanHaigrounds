@@ -98,6 +98,7 @@ export function minionHtml(
     zone?: string
     summonIn?: boolean
     side?: 'player' | 'enemy'
+    board?: Minion[]
   } = {},
 ): string {
   const tribeChar = TRIBE_CHAR[m.tribe] ?? '?'
@@ -132,7 +133,7 @@ export function minionHtml(
     .join(' ')
   const zoneAttr = opts.zone ? `data-zone="${opts.zone}"` : ''
   // tooltip 通过 data-tooltip 属性携带，由全局 mouseover 处理显示
-  const tooltipData = escapeAttr(minionTooltipHtml(m))
+  const tooltipData = escapeAttr(minionTooltipHtml(m, opts.board))
 
   return `<div class="${cls}" data-uid="${m.uid}" ${zoneAttr} data-tooltip="${tooltipData}">
     ${m.tripleRewardPending ? '<div class="triple-badge">奖</div>' : ''}

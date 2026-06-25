@@ -936,10 +936,15 @@ body {
 
 /* ============ 卡片 tooltip 悬停详情（大图+侧边效果） ============ */
 .tooltip-floating {
+  position: fixed;
+  z-index: 9999;
+  pointer-events: none;
+  display: none;
+  max-width: 440px;
   background: linear-gradient(180deg, #3a2f24, #2b2620);
   border: 2px solid var(--gold);
   border-radius: 10px;
-  padding: 0;
+  padding: 12px 14px;
   color: var(--bg-paper);
   font-family: var(--font-serif);
   font-size: 12px;
@@ -1273,8 +1278,17 @@ body {
 
 /* ============ 战斗阶段布局 ============ */
 .combat-layout {
-  justify-content: space-between;
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
   position: relative;
+}
+.combat-center-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-width: 0;
 }
 .combat-side {
   flex: 1;
@@ -1306,25 +1320,54 @@ body {
   text-align: center;
 }
 
-/* ============ 战斗日志 ============ */
-.combat-log {
-  position: absolute;
-  right: 12px;
-  top: 8px;
-  width: 260px;
-  max-height: calc(100% - 16px);
-  background: rgba(43, 38, 32, 0.9);
-  color: var(--bg-paper);
-  border: 2px solid var(--gold);
-  border-radius: 6px;
-  padding: 8px;
-  font-size: 11px;
-  overflow-y: auto;
-  z-index: 20;
-  display: none;
+/* ============ 战斗日志侧边栏 ============ */
+.combat-log-sidebar {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  position: relative;
 }
-.combat-log.visible {
-  display: block;
+.log-toggle-btn {
+  position: absolute;
+  left: -32px;
+  top: 50%;
+  transform: translateY(-50%);
+  writing-mode: vertical-rl;
+  padding: 10px 6px;
+  background: rgba(43, 38, 32, 0.85);
+  color: var(--gold-light);
+  border: 1px solid var(--gold);
+  border-radius: 6px 0 0 6px;
+  font-family: var(--font-serif);
+  font-size: 12px;
+  cursor: pointer;
+  z-index: 21;
+  transition: background 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+.log-toggle-btn:hover {
+  background: rgba(43, 38, 32, 1);
+}
+.combat-log {
+  width: 0;
+  overflow: hidden;
+  background: rgba(43, 38, 32, 0.92);
+  color: var(--bg-paper);
+  border-left: 2px solid var(--gold);
+  padding: 0;
+  font-size: 11px;
+  transition:
+    width 0.25s ease,
+    padding 0.25s ease;
+  flex: 1;
+}
+.combat-log-sidebar.open .combat-log {
+  width: 240px;
+  padding: 8px;
+  overflow-y: auto;
 }
 .combat-log .log-entry {
   padding: 1px 0;
@@ -1877,7 +1920,7 @@ body {
   gap: 6px;
   flex-wrap: wrap;
 }
-.codex-filter-btn {
+.codex-filter-tag {
   padding: 4px 12px;
   border-radius: 4px;
   border: 1px solid rgba(201, 161, 74, 0.5);
@@ -1887,11 +1930,12 @@ body {
   font-size: 13px;
   cursor: pointer;
   transition: all 0.15s;
+  white-space: nowrap;
 }
-.codex-filter-btn:hover {
+.codex-filter-tag:hover {
   background: rgba(201, 161, 74, 0.3);
 }
-.codex-filter-btn.active {
+.codex-filter-tag.active {
   background: var(--vermilion);
   border-color: var(--vermilion);
   color: #fff;
@@ -1901,6 +1945,66 @@ body {
   height: 20px;
   background: rgba(201, 161, 74, 0.3);
   margin: 0 4px;
+}
+
+/* 筛选弹窗 */
+.codex-picker-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.codex-picker-mask {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(2px);
+}
+.codex-picker-panel {
+  position: relative;
+  background: linear-gradient(180deg, #3a2f24, #2b2620);
+  border: 2px solid var(--gold);
+  border-radius: 12px;
+  padding: 24px 28px;
+  min-width: 280px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+}
+.codex-picker-title {
+  font-family: var(--font-calligraphy);
+  font-size: 22px;
+  color: var(--gold-light);
+  text-align: center;
+  margin-bottom: 16px;
+  letter-spacing: 3px;
+}
+.codex-picker-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+}
+.codex-picker-item {
+  padding: 10px 22px;
+  border-radius: 6px;
+  border: 1px solid rgba(201, 161, 74, 0.4);
+  background: rgba(201, 161, 74, 0.1);
+  color: var(--bg-paper);
+  font-family: var(--font-serif);
+  font-size: 15px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.codex-picker-item:hover {
+  background: rgba(201, 161, 74, 0.3);
+  border-color: var(--gold-light);
+}
+.codex-picker-item.active {
+  background: var(--vermilion);
+  border-color: var(--vermilion);
+  color: #fff;
+  font-weight: bold;
 }
 .codex-body {
   flex: 1;
@@ -2138,4 +2242,215 @@ body {
   50% {
     opacity: 0.6;
   }
+}
+
+/* ============ 羁绊面板 ============ */
+.recruit-layout {
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+}
+.recruit-center {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.synergy-sidebar {
+  width: 200px;
+  flex-shrink: 0;
+  overflow-y: auto;
+}
+.synergy-panel {
+  background: linear-gradient(180deg, rgba(43, 38, 32, 0.92), rgba(43, 38, 32, 0.78));
+  border: 2px solid var(--gold);
+  border-radius: 10px;
+  padding: 10px 8px;
+  color: var(--bg-paper);
+}
+.synergy-title {
+  font-family: var(--font-calligraphy);
+  font-size: 16px;
+  color: var(--gold-light);
+  text-align: center;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(201, 161, 74, 0.35);
+  margin-bottom: 8px;
+  letter-spacing: 3px;
+}
+.synergy-empty {
+  text-align: center;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.4);
+  font-style: italic;
+  padding: 12px 0;
+}
+/* 单条羁绊行 */
+.syn-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 4px;
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+.syn-row + .syn-row {
+  margin-top: 2px;
+}
+.syn-row.active {
+  background: rgba(255, 255, 255, 0.06);
+}
+/* 六边形图标 */
+.syn-icon {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+  transition: all 0.2s;
+}
+.syn-icon.glow {
+  animation: synGlow 2s ease-in-out infinite;
+}
+@keyframes synGlow {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.2);
+  }
+}
+.syn-icon-text {
+  font-size: 14px;
+  font-family: var(--font-calligraphy);
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+/* 右侧信息区 */
+.syn-info {
+  flex: 1;
+  min-width: 0;
+}
+.syn-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  line-height: 1.2;
+}
+.syn-count {
+  font-family: var(--font-calligraphy);
+  font-size: 16px;
+  font-weight: bold;
+  min-width: 18px;
+}
+.syn-name {
+  font-family: var(--font-serif);
+  font-size: 13px;
+  color: var(--bg-paper);
+}
+.syn-row.active .syn-name {
+  color: #fff;
+  font-weight: bold;
+}
+/* 阈值进度条 */
+.syn-thresholds {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-top: 2px;
+  font-size: 10px;
+}
+.syn-threshold {
+  padding: 0 4px;
+  border-radius: 3px;
+  color: rgba(255, 255, 255, 0.3);
+  font-family: monospace;
+}
+.syn-threshold.reached {
+  color: #fff;
+  font-weight: bold;
+}
+.syn-sep {
+  color: rgba(255, 255, 255, 0.2);
+  font-size: 9px;
+}
+
+/* 羁绊 tooltip */
+.tt-syn-wrap {
+  padding: 4px 0;
+  font-family: var(--font-serif);
+  font-size: 13px;
+  line-height: 1;
+  color: var(--gold-light);
+  letter-spacing: 1px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid rgba(201, 161, 74, 0.3);
+}
+.tt-syn-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0;
+  color: rgba(255, 255, 255, 0.35);
+}
+.tt-syn-line.active {
+  color: #c5e1a5;
+}
+.tt-syn-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  font-family: monospace;
+  font-size: 11px;
+  font-weight: bold;
+  flex-shrink: 0;
+}
+.tt-syn-line.active .tt-syn-num {
+  background: rgba(46, 125, 107, 0.6);
+  color: #fff;
+}
+.tt-syn-desc {
+  flex: 1;
+}
+
+/* ============ Tooltip 羁绊预览 ============ */
+.tcd-synergy-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px dashed rgba(201, 161, 74, 0.3);
+}
+.tcd-synergy-label {
+  font-size: 10px;
+  color: var(--gold);
+  font-weight: bold;
+  margin-right: 2px;
+}
+.tcd-synergy-up {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: bold;
+  background: rgba(46, 125, 107, 0.85);
+  color: #fff;
+}
+.tcd-synergy-near {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  background: rgba(201, 161, 74, 0.25);
+  color: #d7c9a8;
 }

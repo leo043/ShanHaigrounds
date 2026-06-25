@@ -1,6 +1,7 @@
 // 战斗系统 - 自动战斗模拟（对齐酒馆战棋规则）
 import type { GameState, Minion } from './types'
 import { createSummonMinion, damageMinion } from './game'
+import { calculateSynergies } from './synergy'
 
 /** 战斗中的 buff 辅助函数（与 game.ts 的 buffMinion 逻辑一致） */
 function combatBuff(m: Minion, atk?: number, hp?: number): void {
@@ -85,6 +86,116 @@ export function simulateCombat(state: GameState): CombatResult {
     snap: snap(),
     text: `战斗开始！我方 ${pBoard.length} 子 vs 敌方 ${eBoard.length} 子，${turn === 'player' ? '我方' : '敌方'}先手`,
   })
+
+  // 处理职业羁绊战斗开始效果
+  const playerSynergies = calculateSynergies(state.player.board)
+  const enemySynergies = calculateSynergies(state.enemy.board)
+
+  // 法师羁绊效果
+  for (const syn of playerSynergies) {
+    if (syn.tag === 'mage' && syn.activeLevel >= 1 && eBoard.length > 0) {
+      // Level 1: 对随机敌方造成 2 伤害
+      const target = eBoard[Math.floor(Math.random() * eBoard.length)]
+      if (target.divineShield) {
+        target.divineShield = false
+        steps.push({
+          type: 'shield',
+          side: 'enemy',
+          defenderUid: target.uid,
+          snap: snap(),
+          text: `【法师羁绊】战斗开始伤害被【${target.name}】圣盾抵挡`,
+        })
+      } else {
+        damageMinion(target, 2)
+        steps.push({
+          type: 'hit',
+          side: 'player',
+          defenderUid: target.uid,
+          damage: 2,
+          snap: snap(),
+          text: `【法师羁绊】战斗开始对【${target.name}】造成 2 点伤害`,
+        })
+      }
+      // Level 2: 全体敌方各 1 伤害
+      if (syn.activeLevel >= 2) {
+        for (const enemy of eBoard) {
+          if (enemy.health <= 0) continue
+          if (enemy.divineShield) {
+            enemy.divineShield = false
+            steps.push({
+              type: 'shield',
+              side: 'enemy',
+              defenderUid: enemy.uid,
+              snap: snap(),
+              text: `【法师羁绊 Lv.2】伤害被【${enemy.name}】圣盾抵挡`,
+            })
+          } else {
+            damageMinion(enemy, 1)
+            steps.push({
+              type: 'hit',
+              side: 'player',
+              defenderUid: enemy.uid,
+              damage: 1,
+              snap: snap(),
+              text: `【法师羁绊 Lv.2】对【${enemy.name}】造成 1 点伤害`,
+            })
+          }
+        }
+      }
+    }
+  }
+
+  // 敌方法师羁绊
+  for (const syn of enemySynergies) {
+    if (syn.tag === 'mage' && syn.activeLevel >= 1 && pBoard.length > 0) {
+      const target = pBoard[Math.floor(Math.random() * pBoard.length)]
+      if (target.divineShield) {
+        target.divineShield = false
+        steps.push({
+          type: 'shield',
+          side: 'player',
+          defenderUid: target.uid,
+          snap: snap(),
+          text: `【敌方法师羁绊】战斗开始伤害被【${target.name}】圣盾抵挡`,
+        })
+      } else {
+        damageMinion(target, 2)
+        steps.push({
+          type: 'hit',
+          side: 'enemy',
+          defenderUid: target.uid,
+          damage: 2,
+          snap: snap(),
+          text: `【敌方法师羁绊】战斗开始对【${target.name}】造成 2 点伤害`,
+        })
+      }
+      if (syn.activeLevel >= 2) {
+        for (const ally of pBoard) {
+          if (ally.health <= 0) continue
+          if (ally.divineShield) {
+            ally.divineShield = false
+            steps.push({
+              type: 'shield',
+              side: 'player',
+              defenderUid: ally.uid,
+              snap: snap(),
+              text: `【敌方法师羁绊 Lv.2】伤害被【${ally.name}】圣盾抵挡`,
+            })
+          } else {
+            damageMinion(ally, 1)
+            steps.push({
+              type: 'hit',
+              side: 'enemy',
+              defenderUid: ally.uid,
+              damage: 1,
+              snap: snap(),
+              text: `【敌方法师羁绊 Lv.2】对【${ally.name}】造成 1 点伤害`,
+            })
+          }
+        }
+      }
+    }
+  }
 
   // 处理战斗开始时的效果
   for (const side of ['player', 'enemy'] as const) {
@@ -195,6 +306,12 @@ export function simulateCombat(state: GameState): CombatResult {
     attacksUsed.set(m.uid, (attacksUsed.get(m.uid) ?? 0) + 1)
   }
 
+  // 刺客羁绊 Lv.2: 首次攻击双倍伤害标记
+  const playerAssassinLvl2 = playerSynergies.some((s) => s.tag === 'assassin' && s.activeLevel >= 2)
+  const enemyAssassinLvl2 = enemySynergies.some((s) => s.tag === 'assassin' && s.activeLevel >= 2)
+  const playerFirstAttackUsed = new Set<string>()
+  const enemyFirstAttackUsed = new Set<string>()
+
   while (pBoard.length > 0 && eBoard.length > 0 && guard < 300) {
     guard++
     const atkSide: Side = turn
@@ -252,9 +369,22 @@ export function simulateCombat(state: GameState): CombatResult {
       text: `【${attacker.name}】(${attacker.attack}/${attacker.health})${windfuryTag} 冲向【${defender.name}】(${defender.attack}/${defender.health})`,
     })
 
+    // 判断是否触发刺客双倍伤害
+    const isFirstAttack =
+      atkSide === 'player'
+        ? !playerFirstAttackUsed.has(attacker.uid)
+        : !enemyFirstAttackUsed.has(attacker.uid)
+    const useDoubleDamage =
+      isFirstAttack && (atkSide === 'player' ? playerAssassinLvl2 : enemyAssassinLvl2)
+
+    if (useDoubleDamage) {
+      if (atkSide === 'player') playerFirstAttackUsed.add(attacker.uid)
+      else enemyFirstAttackUsed.add(attacker.uid)
+    }
+
     // 互相造成攻击力伤害
-    resolveHit(attacker, defender, atkSide, steps, snap)
-    resolveHit(defender, attacker, defSide, steps, snap)
+    resolveHit(attacker, defender, atkSide, steps, snap, useDoubleDamage)
+    resolveHit(defender, attacker, defSide, steps, snap, false)
 
     // 清理死亡 + 复生 + 亡语
     pBoard = cleanupDead('player', pBoard, eBoard, steps)
@@ -326,10 +456,12 @@ function resolveHit(
   atkSide: Side,
   steps: CombatStep[],
   snap: () => { p: Minion[]; e: Minion[] },
+  doubleDamage = false,
 ): void {
   if (defender.health <= 0) return
   if (attacker.attack <= 0) return
-  const dmg = attacker.attack
+  let dmg = attacker.attack
+  if (doubleDamage) dmg *= 2
   // 圣盾抵消伤害（含剧毒）
   if (defender.divineShield) {
     defender.divineShield = false
@@ -364,7 +496,7 @@ function resolveHit(
     defenderUid: defender.uid,
     damage: dmg,
     snap: snap(),
-    text: `【${defender.name}】受到 ${dmg} 点伤害（剩 ${Math.max(0, defender.health)}）`,
+    text: `【${defender.name}】受到 ${dmg} 点伤害（剩 ${Math.max(0, defender.health)}）${doubleDamage ? '（刺客双倍）' : ''}`,
   })
 }
 
@@ -505,7 +637,7 @@ function cleanupDead(
   return finalBoard
 }
 
-/** 计算随从造成的伤害部分 = 存活随从星级之和 */
+/** 计算随从造成的伤害部分 = 存活随从星级之和（金卡星级翻倍） */
 function tierDamage(board: Minion[]): number {
-  return board.reduce((s, m) => s + m.tier, 0)
+  return board.reduce((s, m) => s + m.tier * (m.golden ? 2 : 1), 0)
 }

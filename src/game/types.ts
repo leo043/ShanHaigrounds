@@ -3,8 +3,56 @@
 /** 三族：人 / 妖 / 仙 */
 export type Tribe = 'human' | 'demon' | 'spirit'
 
+/** 六职业 */
+export type Class = 'warrior' | 'assassin' | 'mage' | 'archer' | 'priest' | 'shaman'
+
 /** 关键词效果 */
 export type Keyword = 'taunt' | 'divineShield' | 'poison' | 'windfury' | 'reborn'
+
+/** 羁绊激活信息 */
+export interface SynergyInfo {
+  tag: string
+  tagType: 'tribe' | 'class'
+  count: number
+  activeLevel: number
+  maxLevel: number
+  levelThresholds: number[]
+  description: string
+}
+
+/** 种族羁绊激活阈值 */
+export const TRIBE_SYNERGY_LEVELS: Record<Tribe, number[]> = {
+  human: [2, 4, 6],
+  demon: [2, 4, 6],
+  spirit: [2, 4, 6],
+}
+
+/** 职业羁绊激活阈值 */
+export const CLASS_SYNERGY_LEVELS: Record<Class, number[]> = {
+  warrior: [2, 4],
+  assassin: [2, 4],
+  mage: [2, 4],
+  archer: [2, 4],
+  priest: [2, 4],
+  shaman: [2, 4],
+}
+
+/** 种族羁绊效果描述 */
+export const TRIBE_SYNERGY_DESC: Record<Tribe, string[]> = {
+  human: ['全体人族 +1 攻击', '全体人族 +1/+1', '全体人族 +2/+2 且获得嘲讽'],
+  demon: ['全体妖族 +1 生命', '全体妖族 +1/+1', '全体妖族 +2/+2 且获得复生'],
+  spirit: ['全体仙族 +1 攻击', '仙族圣盾恢复', '全体仙族 +2/+2'],
+}
+
+/** 职业羁绊效果描述 */
+export const CLASS_SYNERGY_DESC: Record<Class, string[]> = {
+  warrior: ['全体 +2 生命', '嘲讽随从 +3 攻击'],
+  assassin: ['全体 +2 攻击', '首次攻击双倍伤害'],
+  mage: ['战斗开始对随机敌方 2 伤害', '战斗开始全体敌方各 1 伤害'],
+  archer: ['全体 +1 攻击', '风怒随从 +2 攻击'],
+  priest: ['回合结束 +1/+1', '回合结束 +2/+2'],
+  shaman: ['召唤物 +1/+1', '召唤物 +2/+2 且获得嘲讽'],
+}
 
 /** 触发时机 */
 export type TriggerType =
@@ -43,6 +91,7 @@ export interface CardDef {
   id: string
   name: string
   tribe: Tribe
+  class: Class
   tier: number // 星级 1-5（对应酒馆等级）
   attack: number
   health: number
@@ -57,6 +106,7 @@ export interface Minion {
   defId: string
   name: string
   tribe: Tribe
+  class: Class
   tier: number
   attack: number
   health: number
@@ -66,6 +116,11 @@ export interface Minion {
   golden: boolean // 是否三连金卡
   divineShield: boolean
   hasAttacked: boolean
+  // 羁绊加成追踪（每回合重置再重新计算）
+  synergyBuffAttack: number
+  synergyBuffHealth: number
+  synergyBuffMaxHealth: number
+  synergyAddedKeywords: Keyword[]
   // 状态标记
   poisoned?: boolean
   rebornUsed?: boolean // 复生是否已触发

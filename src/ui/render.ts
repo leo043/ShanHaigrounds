@@ -1,9 +1,12 @@
 // UI 渲染主协调 - GameUI 类、英雄选择、阶段渲染与交互绑定
-import type { GameState, Minion, CardDef } from '../game/types'
+import type { GameState, Minion, CardDef, Tribe, Class } from '../game/types'
 import { HEROES, CARDS } from '../game/cards'
 import { toggleMute, isMuted } from '../game/audio'
 import { HERO_IMAGES } from '../config/assets'
 import { minionHtml, heroHtml, codexCardHtml, rewardCardHtml } from './cards'
+import { calculateSynergies, getTribeName, getClassName } from '../game/synergy'
+import { TRIBE_SYNERGY_DESC, CLASS_SYNERGY_DESC } from '../game/types'
+import { escapeAttr, minionTooltipHtml } from './tooltip'
 
 export type Selection = { type: 'hand'; uid: string } | { type: 'board'; uid: string } | null
 
@@ -107,28 +110,47 @@ export function renderMainMenu(
 /** 渲染随从图鉴 */
 export function renderCodex(root: HTMLElement, onBack: () => void): void {
   bindGlobalTooltip()
-  const tribes: Array<{ key: string; label: string }> = [
+
+  const tribeOptions = [
     { key: 'all', label: '全部' },
     { key: 'human', label: '人族' },
     { key: 'demon', label: '妖族' },
     { key: 'spirit', label: '仙族' },
   ]
-  const tiers: Array<{ key: number | 'all'; label: string }> = [
+  const classOptions = [
     { key: 'all', label: '全部' },
-    { key: 1, label: '★' },
-    { key: 2, label: '★★' },
-    { key: 3, label: '★★★' },
-    { key: 4, label: '★★★★' },
-    { key: 5, label: '★★★★★' },
+    { key: 'warrior', label: '武将' },
+    { key: 'assassin', label: '刺客' },
+    { key: 'mage', label: '法师' },
+    { key: 'archer', label: '射手' },
+    { key: 'priest', label: '祭司' },
+    { key: 'shaman', label: '巫祝' },
+  ]
+  const tierOptions = [
+    { key: 'all', label: '全部' },
+    { key: '1', label: '★' },
+    { key: '2', label: '★★' },
+    { key: '3', label: '★★★' },
+    { key: '4', label: '★★★★' },
+    { key: '5', label: '★★★★★' },
   ]
 
   let filterTribe = 'all'
-  let filterTier: number | 'all' = 'all'
+  let filterClass = 'all'
+  let filterTier = 'all'
+
+  function getLabel(
+    opts: Array<{ key: string | number; label: string }>,
+    val: string | number,
+  ): string {
+    return opts.find((o) => o.key === val)?.label ?? ''
+  }
 
   function renderCards(): void {
     const filtered = CARDS.filter((c) => {
       if (filterTribe !== 'all' && c.tribe !== filterTribe) return false
-      if (filterTier !== 'all' && c.tier !== filterTier) return false
+      if (filterClass !== 'all' && c.class !== filterClass) return false
+      if (filterTier !== 'all' && c.tier !== Number(filterTier)) return false
       return true
     })
 
@@ -140,35 +162,64 @@ export function renderCodex(root: HTMLElement, onBack: () => void): void {
         : '<div class="codex-empty">没有符合条件的随从</div>'
     }
 
-    // 更新计数
     const countEl = root.querySelector('.codex-count')
-    if (countEl) {
-      countEl.textContent = `${filtered.length} / ${CARDS.length}`
-    }
+    if (countEl) countEl.textContent = `${filtered.length} / ${CARDS.length}`
 
-    // 更新筛选按钮状态
-    root.querySelectorAll<HTMLElement>('[data-filter-tribe]').forEach((el) => {
-      el.classList.toggle('active', el.dataset.filterTribe === filterTribe)
-    })
-    root.querySelectorAll<HTMLElement>('[data-filter-tier]').forEach((el) => {
-      const val = el.dataset.filterTier
-      el.classList.toggle('active', val === String(filterTier))
-    })
+    // 更新标签文字和 active 状态
+    const tribeTag = root.querySelector('#codex-filter-tribe') as HTMLElement
+    const classTag = root.querySelector('#codex-filter-class') as HTMLElement
+    const tierTag = root.querySelector('#codex-filter-tier') as HTMLElement
+    if (tribeTag) {
+      tribeTag.textContent = filterTribe === 'all' ? '种族' : getLabel(tribeOptions, filterTribe)
+      tribeTag.classList.toggle('active', filterTribe !== 'all')
+    }
+    if (classTag) {
+      classTag.textContent = filterClass === 'all' ? '羁绊' : getLabel(classOptions, filterClass)
+      classTag.classList.toggle('active', filterClass !== 'all')
+    }
+    if (tierTag) {
+      tierTag.textContent = filterTier === 'all' ? '星级' : getLabel(tierOptions, filterTier)
+      tierTag.classList.toggle('active', filterTier !== 'all')
+    }
   }
 
-  const tribeBtns = tribes
-    .map(
-      (t) =>
-        `<button class="codex-filter-btn${t.key === filterTribe ? ' active' : ''}" data-filter-tribe="${t.key}">${t.label}</button>`,
-    )
-    .join('')
+  function showPicker(
+    title: string,
+    options: Array<{ key: string | number; label: string }>,
+    current: string | number,
+    onSelect: (key: string | number) => void,
+  ): void {
+    // 移除旧弹窗
+    root.querySelector('.codex-picker-overlay')?.remove()
 
-  const tierBtns = tiers
-    .map(
-      (t) =>
-        `<button class="codex-filter-btn${t.key === filterTier ? ' active' : ''}" data-filter-tier="${t.key}">${t.label}</button>`,
-    )
-    .join('')
+    const items = options
+      .map((o) => {
+        const active = o.key === current ? ' active' : ''
+        return `<div class="codex-picker-item${active}" data-pick-key="${o.key}">${o.label}</div>`
+      })
+      .join('')
+
+    const overlay = document.createElement('div')
+    overlay.className = 'codex-picker-overlay'
+    overlay.innerHTML = `
+      <div class="codex-picker-mask"></div>
+      <div class="codex-picker-panel">
+        <div class="codex-picker-title">${title}</div>
+        <div class="codex-picker-options">${items}</div>
+      </div>
+    `
+    root.appendChild(overlay)
+
+    overlay.querySelector('.codex-picker-mask')?.addEventListener('click', () => overlay.remove())
+    overlay.querySelectorAll<HTMLElement>('.codex-picker-item').forEach((el) => {
+      el.addEventListener('click', () => {
+        const key = el.dataset.pickKey ?? 'all'
+        onSelect(key)
+        overlay.remove()
+        renderCards()
+      })
+    })
+  }
 
   root.innerHTML = `
     <div class="codex-overlay">
@@ -177,11 +228,9 @@ export function renderCodex(root: HTMLElement, onBack: () => void): void {
         <div class="codex-title">随从图鉴</div>
         <span class="codex-count">${CARDS.length} / ${CARDS.length}</span>
         <div class="codex-filters">
-          <span style="font-size:12px;color:var(--gold-light);margin-right:2px">种族</span>
-          ${tribeBtns}
-          <div class="codex-filter-sep"></div>
-          <span style="font-size:12px;color:var(--gold-light);margin-right:2px">星级</span>
-          ${tierBtns}
+          <button class="codex-filter-tag" id="codex-filter-tribe">种族</button>
+          <button class="codex-filter-tag" id="codex-filter-class">职业</button>
+          <button class="codex-filter-tag" id="codex-filter-tier">星级</button>
         </div>
       </div>
       <div class="codex-body"></div>
@@ -190,22 +239,110 @@ export function renderCodex(root: HTMLElement, onBack: () => void): void {
 
   root.querySelector('#codex-back')?.addEventListener('click', onBack)
 
-  root.querySelectorAll<HTMLElement>('[data-filter-tribe]').forEach((el) => {
-    el.addEventListener('click', () => {
-      filterTribe = el.dataset.filterTribe ?? 'all'
-      renderCards()
+  root.querySelector('#codex-filter-tribe')?.addEventListener('click', () => {
+    showPicker('选择种族', tribeOptions, filterTribe, (k) => {
+      filterTribe = k as string
     })
   })
-
-  root.querySelectorAll<HTMLElement>('[data-filter-tier]').forEach((el) => {
-    el.addEventListener('click', () => {
-      const val = el.dataset.filterTier ?? 'all'
-      filterTier = val === 'all' ? 'all' : parseInt(val, 10)
-      renderCards()
+  root.querySelector('#codex-filter-class')?.addEventListener('click', () => {
+    showPicker('选择羁绊', classOptions, filterClass, (k) => {
+      filterClass = k as string
+    })
+  })
+  root.querySelector('#codex-filter-tier')?.addEventListener('click', () => {
+    showPicker('选择星级', tierOptions, filterTier, (k) => {
+      filterTier = k as string
     })
   })
 
   renderCards()
+}
+
+/** 羁绊图标（名称首字） */
+const SYNERGY_ICONS: Record<string, string> = {
+  human: '人',
+  demon: '妖',
+  spirit: '仙',
+  warrior: '武',
+  assassin: '刺',
+  mage: '法',
+  archer: '射',
+  priest: '祭',
+  shaman: '巫',
+}
+
+/** 羁绊颜色 */
+const SYNERGY_COLORS: Record<string, string> = {
+  human: '#3a6ea5',
+  demon: '#7b4b94',
+  spirit: '#c9a14a',
+  warrior: '#b0bec5',
+  assassin: '#e74c3c',
+  mage: '#9b59b6',
+  archer: '#27ae60',
+  priest: '#f39c12',
+  shaman: '#1abc9c',
+}
+
+/** 渲染羁绊面板 HTML */
+function synergyPanelHtml(board: Minion[]): string {
+  const synergies = calculateSynergies(board)
+  const activeSynergies = synergies.filter((s) => s.count > 0)
+
+  if (activeSynergies.length === 0) {
+    return '<div class="synergy-panel"><div class="synergy-title">羁绊</div><div class="synergy-empty">战场无随从</div></div>'
+  }
+
+  const items = activeSynergies
+    .map((s) => {
+      const name =
+        s.tagType === 'tribe' ? getTribeName(s.tag as Tribe) : getClassName(s.tag as Class)
+      const icon = SYNERGY_ICONS[s.tag] ?? '?'
+      const color = SYNERGY_COLORS[s.tag] ?? '#888'
+      const isActive = s.activeLevel > 0
+
+      // 生成 tooltip 内容：每级效果
+      const tag = s.tagType === 'tribe' ? (s.tag as Tribe) : (s.tag as Class)
+      const descs =
+        s.tagType === 'tribe' ? TRIBE_SYNERGY_DESC[tag as Tribe] : CLASS_SYNERGY_DESC[tag as Class]
+      const tooltipLines = descs
+        .map((d, i) => {
+          const reached = s.levelThresholds[i] <= s.count
+          return `<div class="tt-syn-line ${reached ? 'active' : ''}">
+            <span class="tt-syn-num">${s.levelThresholds[i]}</span>
+            <span class="tt-syn-desc">${d}</span>
+          </div>`
+        })
+        .join('')
+      const tooltip = escapeAttr(
+        `<div class="tt-syn-wrap">${name}（${s.count}）${tooltipLines}</div>`,
+      )
+
+      // 阈值进度：显示每个阈值，已激活的高亮
+      const thresholds = s.levelThresholds
+      const progressDots = thresholds
+        .map((t) => {
+          const reached = s.count >= t
+          return `<span class="syn-threshold ${reached ? 'reached' : ''}">${t}</span>`
+        })
+        .join('<span class="syn-sep">›</span>')
+
+      return `<div class="syn-row ${isActive ? 'active' : ''}" data-tooltip="${tooltip}">
+        <div class="syn-icon ${isActive ? 'glow' : ''}" style="background:${isActive ? color : 'rgba(255,255,255,0.12)'};${isActive ? `box-shadow:0 0 10px ${color}88` : ''}">
+          <span class="syn-icon-text">${icon}</span>
+        </div>
+        <div class="syn-info">
+          <div class="syn-top">
+            <span class="syn-count" style="color:${isActive ? color : '#888'}">${s.count}</span>
+            <span class="syn-name">${name}</span>
+          </div>
+          <div class="syn-thresholds">${progressDots}</div>
+        </div>
+      </div>`
+    })
+    .join('')
+
+  return `<div class="synergy-panel"><div class="synergy-title">羁绊</div>${items}</div>`
 }
 
 /** 全局 tooltip：监听 mouseover/mouseout，根据 data-tooltip 显示浮窗（只绑定一次） */
@@ -219,8 +356,6 @@ function bindGlobalTooltip(): void {
       tooltipEl = document.createElement('div')
       tooltipEl.id = 'global-tooltip'
       tooltipEl.className = 'tooltip-floating'
-      tooltipEl.style.cssText =
-        'position:fixed;z-index:9999;pointer-events:none;display:none;max-width:440px;'
       document.body.appendChild(tooltipEl)
     }
     return tooltipEl
@@ -239,11 +374,30 @@ function bindGlobalTooltip(): void {
     const rect = card.getBoundingClientRect()
     const tw = t.offsetWidth
     const th = t.offsetHeight
-    let left = rect.left + rect.width / 2 - tw / 2
-    let top = rect.top - th - 8
-    if (top < 4) top = rect.bottom + 8 // 下方
-    if (left < 4) left = 4
-    if (left + tw > window.innerWidth - 4) left = window.innerWidth - tw - 4
+    const pad = 10
+    // 优先显示在元素右侧
+    let left = rect.right + pad
+    let top = rect.top + rect.height / 2 - th / 2
+    // 右侧放不下则显示在左侧
+    if (left + tw > window.innerWidth - pad) {
+      left = rect.left - tw - pad
+    }
+    // 左侧也放不下则居中显示在上方
+    if (left < pad) {
+      left = rect.left + rect.width / 2 - tw / 2
+      top = rect.top - th - pad
+    }
+    // 上方放不下则显示在下方
+    if (top < pad) {
+      top = rect.bottom + pad
+    }
+    // 底部溢出
+    if (top + th > window.innerHeight - pad) {
+      top = window.innerHeight - th - pad
+    }
+    // 水平边界修正
+    if (left < pad) left = pad
+    if (left + tw > window.innerWidth - pad) left = window.innerWidth - tw - pad
     t.style.left = left + 'px'
     t.style.top = top + 'px'
   })
@@ -301,12 +455,28 @@ export class GameUI {
         ? this.selection.uid
         : null
 
-    const tavernCards = s.player.tavern.map((m) => minionHtml(m, { zone: 'tavern' })).join('')
+    const tavernCards = s.player.tavern
+      .map((m) => minionHtml(m, { zone: 'tavern', board: s.player.board }))
+      .join('')
     const handCards = s.player.hand
-      .map((m) => minionHtml(m, { hand: true, selected: m.uid === selUid, zone: 'hand' }))
+      .map((m) =>
+        minionHtml(m, {
+          hand: true,
+          selected: m.uid === selUid,
+          zone: 'hand',
+          board: s.player.board,
+        }),
+      )
       .join('')
     const boardCards = s.player.board
-      .map((m) => minionHtml(m, { selected: m.uid === selUid, zone: 'board', side: 'player' }))
+      .map((m) =>
+        minionHtml(m, {
+          selected: m.uid === selUid,
+          zone: 'board',
+          side: 'player',
+          board: s.player.board,
+        }),
+      )
       .join('')
     const emptySlot =
       s.player.board.length < 7
@@ -363,28 +533,36 @@ export class GameUI {
 
       <!-- ====== 主区域：酒馆 → 战场 → 手牌 ====== -->
       <div class="main-area recruit-layout">
-        <!-- 酒馆行（在上方！） -->
-        <div class="tavern-row">
-          <div class="row-label">酒馆商店</div>
-          <div class="tavern-cards" id="tavern-cards">${tavernCards || '<span class="empty-row">暂无商品，点击刷新</span>'}</div>
+        <!-- 羁绊面板（左侧） -->
+        <div class="synergy-sidebar" id="synergy-panel">
+          ${synergyPanelHtml(s.player.board)}
         </div>
 
-        <!-- 我方战场 -->
-        <div class="board-row">
-          <div class="row-label">我方阵容</div>
-          <div class="board-zone" id="player-board">${boardCards}${emptySlot}</div>
-        </div>
+        <!-- 中间区域 -->
+        <div class="recruit-center">
+          <!-- 酒馆行（在上方！） -->
+          <div class="tavern-row">
+            <div class="row-label">酒馆商店</div>
+            <div class="tavern-cards" id="tavern-cards">${tavernCards || '<span class="empty-row">暂无商品，点击刷新</span>'}</div>
+          </div>
 
-        <!-- 提示信息 -->
-        <div class="hint-bar">
-          <span>${hint}</span>
-          <span class="enemy-tag">敌方备战中 · 酒馆${s.enemy.tavernTier}级 · 棋子${s.enemy.board.length}/7</span>
-        </div>
+          <!-- 我方战场 -->
+          <div class="board-row">
+            <div class="row-label">我方阵容</div>
+            <div class="board-zone" id="player-board">${boardCards}${emptySlot}</div>
+          </div>
 
-        <!-- 手牌区（底部悬浮） -->
-        <div class="hand-row">
-          <div class="row-label">手牌 (${s.player.hand.length}/10)</div>
-          <div class="hand-zone" id="player-hand">${handCards || '<span class="empty-hand">手牌为空</span>'}</div>
+          <!-- 提示信息 -->
+          <div class="hint-bar">
+            <span>${hint}</span>
+            <span class="enemy-tag">敌方备战中 · 酒馆${s.enemy.tavernTier}级 · 棋子${s.enemy.board.length}/7</span>
+          </div>
+
+          <!-- 手牌区（底部悬浮） -->
+          <div class="hand-row">
+            <div class="row-label">手牌 (${s.player.hand.length}/10)</div>
+            <div class="hand-zone" id="player-hand">${handCards || '<span class="empty-hand">手牌为空</span>'}</div>
+          </div>
         </div>
       </div>
     `
@@ -451,21 +629,40 @@ export class GameUI {
         ${heroHtml(s.player, false)}
       </div>
       <div class="main-area combat-layout">
-        <div class="combat-side combat-enemy">
-          <div class="row-label">敌阵</div>
-          <div class="board-zone enemy" id="board-enemy">${eHtml || '<span class="empty-hint">空</span>'}</div>
+        <div class="synergy-sidebar" id="synergy-panel">
+          ${synergyPanelHtml(s.player.board)}
         </div>
-        <div class="combat-center">
-          <div class="message-title">${title}</div>
-          <div class="message-sub">${sub}</div>
+        <div class="combat-center-area">
+          <div class="combat-side combat-enemy">
+            <div class="row-label">敌阵</div>
+            <div class="board-zone enemy" id="board-enemy">${eHtml || '<span class="empty-hint">空</span>'}</div>
+          </div>
+          <div class="combat-center">
+            <div class="message-title">${title}</div>
+            <div class="message-sub">${sub}</div>
+          </div>
+          <div class="combat-side combat-player">
+            <div class="row-label">我阵</div>
+            <div class="board-zone" id="player-board">${pHtml || '<span class="empty-hint">空</span>'}</div>
+          </div>
         </div>
-        <div class="combat-side combat-player">
-          <div class="row-label">我阵</div>
-          <div class="board-zone" id="player-board">${pHtml || '<span class="empty-hint">空</span>'}</div>
+        <div class="combat-log-sidebar open" id="combat-log-sidebar">
+          <button class="log-toggle-btn" id="log-toggle">▸ 日志</button>
+          <div class="combat-log" id="combat-log">${logHtml}</div>
         </div>
-        <div class="combat-log visible" id="combat-log">${logHtml}</div>
       </div>
     `
+    this.bindLogToggle()
+  }
+
+  private bindLogToggle(): void {
+    const sidebar = this.root.querySelector('#combat-log-sidebar') as HTMLElement | null
+    const btn = this.root.querySelector('#log-toggle') as HTMLElement | null
+    if (!sidebar || !btn) return
+    btn.addEventListener('click', () => {
+      sidebar.classList.toggle('open')
+      btn.textContent = sidebar.classList.contains('open') ? '▸ 日志' : '◂ 日志'
+    })
   }
 
   /** 轻量更新：只更新日志和标题，不重建棋盘 DOM */
@@ -478,7 +675,7 @@ export class GameUI {
     if (subEl) subEl.textContent = sub
   }
 
-  /** 轻量更新：根据快照原地更新 HP / 攻击力 / 圣盾状态，不重建 DOM */
+  /** 轻量更新：根据快照原地更新 HP / 攻击力 / 圣盾状态，同时刷新悬停详情 */
   updateCombatHp(pBoard: Minion[], eBoard: Minion[]): void {
     const updateSide = (board: Minion[], zoneSelector: string) => {
       const zone = this.root.querySelector(zoneSelector)
@@ -494,9 +691,9 @@ export class GameUI {
         }
         const atkEl = el.querySelector('.card-atk')
         if (atkEl) atkEl.textContent = String(m.attack)
-        // 关键词视觉层显隐由 has-* class 控制（CSS 层面），无需操作 DOM 子元素
         el.classList.toggle('has-shield', m.divineShield)
         el.classList.toggle('has-reborn', m.keywords.includes('reborn') && !m.rebornUsed)
+        el.setAttribute('data-tooltip', escapeAttr(minionTooltipHtml(m)))
       }
     }
     updateSide(pBoard, '#player-board')
