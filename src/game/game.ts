@@ -4,24 +4,29 @@ import { CARDS, CARD_MAP, HEROES, getSummonDef } from './cards'
 import { TIER_MAX_BY_TAVERN, UPGRADE_BASE_COST, TAVERN_OFFER_COUNT, goldForTurn } from './types'
 import { recalcSynergyAuras } from './synergy'
 
-let uidCounter = 0
-function nextUid(): string {
-  uidCounter += 1
-  return `m${uidCounter}`
+/** 创建 uid 生成器闭包（每局游戏独立，避免多实例 uid 冲突） */
+function createUidGen(): () => string {
+  let counter = 0
+  return () => {
+    counter += 1
+    return `m${counter}`
+  }
 }
 
-/** 重置 uid 计数器（新游戏时自动调用，也可用于测试隔离） */
+/** 重置 uid 计数器（兼容旧测试：创建新的生成器） */
+let _legacyUidCounter = 0
 export function resetUid(): void {
-  uidCounter = 0
+  _legacyUidCounter = 0
 }
 
 /** 从卡牌定义创建随从实例 */
-export function createMinion(def: CardDef, golden = false): Minion {
+export function createMinion(def: CardDef, golden = false, uidGen?: () => string): Minion {
   const mult = golden ? 2 : 1
   const atk = def.attack * mult
   const hp = def.health * mult
+  const uid = uidGen ? uidGen() : `m${++_legacyUidCounter}`
   return {
-    uid: nextUid(),
+    uid,
     defId: def.id,
     name: def.name,
     tribe: def.tribe,
@@ -57,13 +62,16 @@ function goldenizeEffects(effects: Effect[]): Effect[] {
 }
 
 /** 从衍生物定义创建随从 */
-export function createSummonMinion(summon: {
-  name: string
-  attack: number
-  health: number
-  tribe: Tribe
-}): Minion {
-  return createMinion(getSummonDef(summon))
+export function createSummonMinion(
+  summon: {
+    name: string
+    attack: number
+    health: number
+    tribe: Tribe
+  },
+  uidGen?: () => string,
+): Minion {
+  return createMinion(getSummonDef(summon), false, uidGen)
 }
 
 /** 创建初始玩家 */
@@ -93,12 +101,11 @@ export function createPlayer(heroId: string, isAI: boolean): PlayerState {
 
 /** 创建新游戏 */
 export function createGame(playerHeroId: string, enemyHeroId: string): GameState {
-  // 重置 uid 计数器，确保每局游戏的 uid 从 m1 开始
-  resetUid()
+  const uidGen = createUidGen()
   const player = createPlayer(playerHeroId, false)
   const enemy = createPlayer(enemyHeroId, true)
-  rollTavern(player)
-  rollTavern(enemy)
+  rollTavern(player, uidGen)
+  rollTavern(enemy, uidGen)
   return {
     turn: 1,
     phase: 'recruit',
@@ -106,6 +113,7 @@ export function createGame(playerHeroId: string, enemyHeroId: string): GameState
     enemy,
     log: [{ text: '第 1 回合 · 招募阶段', type: 'info' }],
     winner: null,
+    uidGen,
   }
 }
 
@@ -116,7 +124,7 @@ function availableCards(tavernTier: number): CardDef[] {
 }
 
 /** 随机刷新酒馆 */
-export function rollTavern(player: PlayerState): void {
+export function rollTavern(player: PlayerState, uidGen?: () => string): void {
   if (player.frozen && player.tavern.length > 0) {
     player.frozen = false
     return
@@ -126,20 +134,20 @@ export function rollTavern(player: PlayerState): void {
   player.tavern = []
   for (let i = 0; i < count; i++) {
     const def = pool[Math.floor(Math.random() * pool.length)]
-    player.tavern.push(createMinion(def))
+    player.tavern.push(createMinion(def, false, uidGen))
   }
   player.frozen = false
 }
 
 /** 购买随从（花 3 金币，加入手牌） */
-export function buyMinion(player: PlayerState, tavernIndex: number): void {
+export function buyMinion(player: PlayerState, tavernIndex: number, uidGen?: () => string): void {
   if (player.gold < 3) return
   if (tavernIndex < 0 || tavernIndex >= player.tavern.length) return
   if (player.hand.length >= 10) return
   const minion = player.tavern.splice(tavernIndex, 1)[0]
   player.hand.push(minion)
   player.gold -= 3
-  checkTriple(player)
+  checkTriple(player, uidGen)
 }
 
 /** 卖出随从（+1 金币，不超过 maxGold） */
@@ -164,18 +172,23 @@ export function swapMinions(player: PlayerState, uidA: string, uidB: string): bo
 }
 
 /** 打出随从到手牌指定战场位置。返回 true 表示该卡为三连金卡，需触发三选一奖励 */
-export function playMinion(player: PlayerState, handIndex: number, boardIndex: number): boolean {
+export function playMinion(
+  player: PlayerState,
+  handIndex: number,
+  boardIndex: number,
+  uidGen?: () => string,
+): boolean {
   if (handIndex < 0 || handIndex >= player.hand.length) return false
   if (player.board.length >= 7) return false
   const minion = player.hand.splice(handIndex, 1)[0]
   const insertAt = Math.min(boardIndex, player.board.length)
   player.board.splice(insertAt, 0, minion)
   // 触发战吼
-  triggerBattlecry(player, minion)
+  triggerBattlecry(player, minion, null, uidGen)
   // 战场变化后重算羁绊光环
   recalcSynergyAuras(player.board)
   // 检查三连合成（打出过程中可能触发新的三连，合成后的金卡加入手牌）
-  checkTriple(player)
+  checkTriple(player, uidGen)
   // 关键：三连奖励在打出金卡时触发（而不是合成瞬间）
   const triggerReward = !!minion.tripleRewardPending
   minion.tripleRewardPending = false
@@ -183,10 +196,15 @@ export function playMinion(player: PlayerState, handIndex: number, boardIndex: n
 }
 
 /** 触发战吼 */
-function triggerBattlecry(player: PlayerState, minion: Minion): void {
+function triggerBattlecry(
+  player: PlayerState,
+  minion: Minion,
+  enemy?: PlayerState | null,
+  uidGen?: () => string,
+): void {
   const battles = minion.effects.filter((e) => e.trigger === 'battlecry')
   for (const e of battles) {
-    applyEffect(player, minion, e, null)
+    applyEffect(player, minion, e, enemy ?? null, uidGen)
   }
 }
 
@@ -206,6 +224,7 @@ export function applyEffect(
     divineShield?: boolean
   },
   enemy: PlayerState | null,
+  uidGen?: () => string,
 ): void {
   const idx = player.board.indexOf(source)
   switch (effect.target) {
@@ -229,7 +248,7 @@ export function applyEffect(
       break
     case 'summonMinion':
       if (effect.summon && player.board.length < 7) {
-        player.board.push(createSummonMinion(effect.summon))
+        player.board.push(createSummonMinion(effect.summon, uidGen))
       }
       break
     case 'damageRandomEnemy':
@@ -261,7 +280,7 @@ export function damageMinion(m: Minion, dmg: number): void {
 }
 
 /** 检查并执行三连合成。合成出的金卡标记 tripleRewardPending，待打出时触发奖励 */
-export function checkTriple(player: PlayerState): void {
+export function checkTriple(player: PlayerState, uidGen?: () => string): void {
   // 按 defId 分组，找手牌+战场中同名（金卡算2份）达到3的
   const all = [...player.hand, ...player.board]
   const groups: Record<string, Minion[]> = {}
@@ -280,7 +299,7 @@ export function checkTriple(player: PlayerState): void {
       removeFromPlayer(player, b.uid)
       removeFromPlayer(player, c.uid)
       const def = CARD_MAP[defId]
-      const golden = createMinion(def, true)
+      const golden = createMinion(def, true, uidGen)
       golden.attack = totalAtk
       golden.health = totalHp
       golden.maxHealth = totalHp
@@ -310,10 +329,10 @@ export function generateTripleReward(player: PlayerState): CardDef[] {
 }
 
 /** 应用三连奖励：将选中的卡加入手牌 */
-export function applyTripleReward(player: PlayerState, def: CardDef): void {
+export function applyTripleReward(player: PlayerState, def: CardDef, uidGen?: () => string): void {
   if (player.hand.length >= 10) return
-  player.hand.push(createMinion(def))
-  checkTriple(player)
+  player.hand.push(createMinion(def, false, uidGen))
+  checkTriple(player, uidGen)
 }
 
 function removeFromPlayer(player: PlayerState, uid: string): void {
@@ -327,17 +346,17 @@ function removeFromPlayer(player: PlayerState, uid: string): void {
 }
 
 /** 刷新酒馆（白虎英雄每回合首次免费） */
-export function refreshTavern(player: PlayerState): boolean {
+export function refreshTavern(player: PlayerState, uidGen?: () => string): boolean {
   if (player.hero.power === 'freeRefreshOnce' && !player.hero.freeRefreshUsed) {
     player.hero.freeRefreshUsed = true
     player.frozen = false
-    rollTavern(player)
+    rollTavern(player, uidGen)
     return true
   }
   if (player.gold < 1) return false
   player.gold -= 1
   player.frozen = false
-  rollTavern(player)
+  rollTavern(player, uidGen)
   return true
 }
 
@@ -378,21 +397,25 @@ export function startTurn(state: GameState): void {
       p.upgradeCost = Math.max(0, p.upgradeCost - 1)
     }
     // 触发回合开始效果
-    triggerStartOfTurn(p)
+    triggerStartOfTurn(p, null, state.uidGen)
     // 回合开始效果可能召唤新随从，需要重算羁绊光环
     recalcSynergyAuras(p.board)
     // 刷新酒馆
-    rollTavern(p)
+    rollTavern(p, state.uidGen)
   }
   state.phase = 'recruit'
   state.log.push({ text: `第 ${state.turn} 回合 · 招募阶段`, type: 'info' })
 }
 
-function triggerStartOfTurn(player: PlayerState): void {
+function triggerStartOfTurn(
+  player: PlayerState,
+  enemy?: PlayerState | null,
+  uidGen?: () => string,
+): void {
   for (const m of player.board) {
     for (const e of m.effects) {
       if (e.trigger === 'startOfTurn') {
-        applyEffect(player, m, e, null)
+        applyEffect(player, m, e, enemy ?? null, uidGen)
       }
     }
   }
@@ -402,18 +425,18 @@ function triggerStartOfTurn(player: PlayerState): void {
 export function endRecruitPhase(state: GameState): void {
   for (const p of [state.player, state.enemy]) {
     // 触发回合结束效果
-    triggerEndOfTurn(p)
+    triggerEndOfTurn(p, state.uidGen)
     // 回合结束效果可能召唤新随从，需要重算羁绊光环
     recalcSynergyAuras(p.board)
   }
   state.phase = 'combat'
 }
 
-function triggerEndOfTurn(player: PlayerState): void {
+function triggerEndOfTurn(player: PlayerState, uidGen?: () => string): void {
   for (const m of [...player.board]) {
     for (const e of m.effects) {
       if (e.trigger === 'endOfTurn') {
-        applyEffect(player, m, e, null)
+        applyEffect(player, m, e, null, uidGen)
       }
     }
   }

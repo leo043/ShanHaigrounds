@@ -1,5 +1,6 @@
 // AI 对手 - 招募阶段决策
 import type { GameState, PlayerState, Minion, CardDef } from './types'
+import { TRIBE_SYNERGY_LEVELS, CLASS_SYNERGY_LEVELS } from './types'
 import {
   buyMinion,
   sellMinion,
@@ -21,20 +22,36 @@ function minionValue(m: Minion): number {
   return v
 }
 
-/** 卡牌定义价值（用于 AI 选三连奖励） */
-function cardDefValue(def: CardDef): number {
+/** 卡牌定义价值（用于 AI 选三连奖励，考虑阵容需要） */
+function cardDefValue(def: CardDef, ai: PlayerState): number {
   let v = def.attack + def.health
   if (def.keywords?.includes('taunt')) v += 2
   if (def.keywords?.includes('divineShield')) v += 3
   if (def.keywords?.includes('reborn')) v += 3
   if (def.effects && def.effects.length > 0) v += 3
   v += def.tier // 高星卡更值钱
+
+  // 羁绊协同加成
+  const tribeCount = countTribes(ai.board)
+  const classCount = countClasses(ai.board)
+  v += (tribeCount[def.tribe] ?? 0) * 2
+  v += (classCount[def.class] ?? 0) * 2
+
+  // 缺嘲讽时优先嘲讽卡
+  if (
+    def.keywords?.includes('taunt') &&
+    ai.board.filter((b) => b.keywords.includes('taunt')).length === 0
+  ) {
+    v += 4
+  }
+
   return v
 }
 
 /** 执行 AI 一整个招募回合 */
 export function runAITurn(state: GameState): void {
   const ai = state.enemy
+  const uidGen = state.uidGen
   let actions = 0
   const maxActions = 30 // 防止死循环
 
@@ -51,22 +68,22 @@ export function runAITurn(state: GameState): void {
     // 2. 尝试凑三连：买酒馆里能凑三连的
     const buyForTriple = findTripleBuy(ai)
     if (buyForTriple >= 0 && ai.gold >= 3) {
-      buyMinion(ai, buyForTriple)
+      buyMinion(ai, buyForTriple, uidGen)
       // 买完直接尝试打出
-      tryPlayHand(ai)
+      tryPlayHand(ai, uidGen)
       continue
     }
 
     // 3. 买价值高的同族随从
     const buyIdx = findBestBuy(ai)
     if (buyIdx >= 0 && ai.gold >= 3 && ai.hand.length < 10) {
-      buyMinion(ai, buyIdx)
+      buyMinion(ai, buyIdx, uidGen)
       continue
     }
 
     // 4. 打出手牌
     if (ai.hand.length > 0 && ai.board.length < 7) {
-      tryPlayHand(ai)
+      tryPlayHand(ai, uidGen)
       continue
     }
 
@@ -84,9 +101,14 @@ export function runAITurn(state: GameState): void {
       }
     }
 
-    // 6. 还有钱且酒馆没好货，刷新一次
-    if (ai.gold >= 2 && ai.tavern.every((m) => minionValue(m) < 5) && ai.tavernTier < 6) {
-      refreshTavern(ai)
+    // 6. 还有钱且酒馆没好货，刷新一次（前期不浪费钱刷新）
+    if (
+      ai.gold >= 2 &&
+      state.turn > 3 &&
+      ai.tavern.every((m) => minionValue(m) < 5) &&
+      ai.tavernTier < 6
+    ) {
+      refreshTavern(ai, uidGen)
       continue
     }
 
@@ -96,7 +118,7 @@ export function runAITurn(state: GameState): void {
 
   // 确保手牌尽量打出
   while (ai.hand.length > 0 && ai.board.length < 7) {
-    tryPlayHand(ai)
+    tryPlayHand(ai, uidGen)
   }
 }
 
@@ -120,16 +142,45 @@ function findTripleBuy(ai: PlayerState): number {
   return -1
 }
 
-/** 找酒馆里最值得买的（优先同族、高价值） */
+/** 找酒馆里最值得买的（羁绊意识 + 同族 + 高价值） */
 function findBestBuy(ai: PlayerState): number {
   const tribeCount = countTribes(ai.board)
+  const classCount = countClasses(ai.board)
   let bestIdx = -1
   let bestScore = -1
   for (let i = 0; i < ai.tavern.length; i++) {
     const m = ai.tavern[i]
     let score = minionValue(m)
+
+    // 羁绊推进加成：接近下一个阈值时加分
+    const tribeThresholds = TRIBE_SYNERGY_LEVELS[m.tribe]
+    const currentTribe = tribeCount[m.tribe] ?? 0
+    for (const t of tribeThresholds) {
+      if (currentTribe + 1 === t) {
+        score += 5
+        break
+      } // 差 1 个激活
+      if (currentTribe + 1 >= t) {
+        score += 2
+        break
+      } // 已激活，继续叠
+    }
+    const classThresholds = CLASS_SYNERGY_LEVELS[m.class]
+    const currentClass = classCount[m.class] ?? 0
+    for (const t of classThresholds) {
+      if (currentClass + 1 === t) {
+        score += 4
+        break
+      }
+      if (currentClass + 1 >= t) {
+        score += 1
+        break
+      }
+    }
+
     // 同族加成
-    score += (tribeCount[m.tribe] ?? 0) * 2
+    score += currentTribe * 1
+
     // 嘲讽优先（前期缺肉盾）
     if (
       m.keywords.includes('taunt') &&
@@ -152,8 +203,15 @@ function countTribes(board: Minion[]): Record<string, number> {
   return c
 }
 
+/** 统计战场上各职业数量 */
+function countClasses(board: Minion[]): Record<string, number> {
+  const c: Record<string, number> = {}
+  for (const m of board) c[m.class] = (c[m.class] ?? 0) + 1
+  return c
+}
+
 /** 尝试打出手牌（优先高价值的，按 AI 站位策略放置） */
-function tryPlayHand(ai: PlayerState): void {
+function tryPlayHand(ai: PlayerState, uidGen?: () => string): void {
   if (ai.hand.length === 0 || ai.board.length >= 7) return
   // 选价值最高的手牌
   let bestIdx = 0
@@ -167,7 +225,7 @@ function tryPlayHand(ai: PlayerState): void {
   }
   const m = ai.hand[bestIdx]
   const pos = pickAiPosition(ai.board, m)
-  const triggered = playMinion(ai, bestIdx, pos)
+  const triggered = playMinion(ai, bestIdx, pos, uidGen)
   // AI 打出金卡触发三连奖励：自动选价值最高的奖励卡
   if (triggered) {
     const rewards = generateTripleReward(ai)
@@ -175,31 +233,29 @@ function tryPlayHand(ai: PlayerState): void {
       let pick = rewards[0]
       let pickVal = -1
       for (const r of rewards) {
-        const v = cardDefValue(r)
+        const v = cardDefValue(r, ai)
         if (v > pickVal) {
           pickVal = v
           pick = r
         }
       }
-      applyTripleReward(ai, pick)
+      applyTripleReward(ai, pick, uidGen)
     }
   }
 }
 
 /**
- * AI 站位策略（替代原"嘲讽永远最左"）：
- * 1. 嘲讽：分散放置。第一个嘲讽放最左（0），第二个放右侧 1/3 处，第三个放右侧 2/3 处
+ * AI 站位策略：
+ * 1. 嘲讽：最左侧保护核心随从
  * 2. 亡语相邻 buff 卡：放中间位置（影响更多相邻随从）
- * 3. 高输出低血（attack > health * 1.5 且无嘲讽）：放右侧末尾，避免先被解
- * 4. 其他：放末尾
+ * 3. 高输出低血刺客/射手：放最右侧（先手位，战棋右侧先行动）
+ * 4. 圣盾随从：放左侧嘲讽之后（能多扛一轮）
+ * 5. 其他：放末尾
  */
 function pickAiPosition(board: Minion[], m: Minion): number {
-  // 嘲讽分散
+  // 嘲讽最左
   if (m.keywords.includes('taunt')) {
-    const tauntCount = board.filter((b) => b.keywords.includes('taunt')).length
-    if (tauntCount === 0) return 0
-    if (tauntCount === 1) return Math.max(1, Math.floor(board.length / 3))
-    return Math.min(board.length, Math.floor((board.length * 2) / 3))
+    return 0
   }
   // 亡语相邻 buff 卡放中间
   const hasAdjacentBuff = m.effects.some(
@@ -208,8 +264,13 @@ function pickAiPosition(board: Minion[], m: Minion): number {
   if (hasAdjacentBuff) {
     return Math.floor(board.length / 2)
   }
-  // 高输出低血放末尾（右后方）
-  if (m.attack > m.health * 1.5 && m.health <= 3) {
+  // 圣盾随从放嘲讽之后（第 1-2 位）
+  if (m.divineShield) {
+    const tauntIdx = board.findIndex((b) => b.keywords.includes('taunt'))
+    return tauntIdx >= 0 ? 1 : 0
+  }
+  // 高输出低血（刺客/射手型）放最右侧先手位
+  if (m.attack > m.health * 1.2 && m.health <= 4) {
     return board.length
   }
   // 默认末尾

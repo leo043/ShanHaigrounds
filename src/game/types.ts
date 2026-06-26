@@ -182,7 +182,8 @@ export interface GameState {
   enemy: PlayerState
   log: CombatLogEntry[]
   winner: 'player' | 'enemy' | null
-  // 升级酒馆的基准费用表（1->2 是 5，依次递增）
+  /** 实例级 uid 生成器（避免多游戏实例 uid 冲突） */
+  uidGen: () => string
 }
 
 /** 酒馆各等级可购买的随从星级上限 */

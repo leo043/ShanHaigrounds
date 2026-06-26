@@ -16,65 +16,14 @@ import {
   applyTripleReward,
 } from './game'
 import { simulateCombat } from './combat'
-import type { CombatResult, CombatStep } from './combat'
 import { GameUI } from '../ui/render'
 import { CARD_MAP, HEROES } from './cards'
 import type { Minion } from './types'
 import type { MultiplayerClient } from '../net/client'
 import type { ServerMessage } from '../net/protocol'
+import { cloneBoard } from './shared'
+import { playCombatAnimation } from './combat-anim'
 import * as sfx from './audio'
-
-function delay(ms: number): Promise<void> {
-  return new Promise((r) => setTimeout(r, ms))
-}
-
-function cloneBoard(board: Minion[]): Minion[] {
-  return board.map((m) => ({
-    ...m,
-    keywords: [...m.keywords],
-    effects: m.effects.map((e) => ({ ...e })),
-  }))
-}
-
-function getCardEl(uid: string): HTMLElement | null {
-  return document.querySelector<HTMLElement>(`#app .card[data-uid="${uid}"]`)
-}
-
-function logClass(type: CombatStep['type']): string {
-  if (type === 'hit' || type === 'attackStart') return 'attack'
-  if (type === 'death') return 'death'
-  if (type === 'shield') return 'shield'
-  if (type === 'heroDamage') return 'heroDamage'
-  if (type === 'summon') return 'summon'
-  if (type === 'reborn') return 'reborn'
-  return 'info'
-}
-
-function titleFor(step: CombatStep, result: CombatResult): string {
-  if (step.type === 'heroDamage') {
-    return step.side === 'player' ? '大获全胜' : '不敌败北'
-  }
-  if (step.type === 'end' && step.text === '战斗结束') {
-    return result.winner === 'player'
-      ? '大获全胜'
-      : result.winner === 'enemy'
-        ? '不敌败北'
-        : '势均力敌'
-  }
-  if (step.type === 'info') return '两军交锋'
-  return '交锋中'
-}
-
-function subFor(step: CombatStep): string {
-  if (step.type === 'heroDamage') return step.text
-  if (step.type === 'info') return step.text
-  return ''
-}
-
-function scrollLog(): void {
-  const el = document.getElementById('combat-log')
-  if (el) el.scrollTop = el.scrollHeight
-}
 
 export class MultiplayerGameController {
   private state: ReturnType<typeof createGame>
@@ -179,7 +128,7 @@ export class MultiplayerGameController {
 
     // 播放战斗动画
     sfx.sfxCombatStart()
-    await this.playCombatAnimation(result)
+    await playCombatAnimation(this.ui, result, this.state.player.board, this.state.enemy.board)
 
     // 结算英雄伤害
     if (result.winner === 'player') {
@@ -243,7 +192,7 @@ export class MultiplayerGameController {
   private onBuy(uid: string): void {
     const idx = this.state.player.tavern.findIndex((m) => m.uid === uid)
     if (idx < 0) return
-    buyMinion(this.state.player, idx)
+    buyMinion(this.state.player, idx, this.state.uidGen)
     sfx.sfxBuy()
     this.ui.selection = null
     this.ui.renderRecruit()
@@ -274,7 +223,6 @@ export class MultiplayerGameController {
     }
     if (this.ui.selection?.type === 'board') {
       swapMinions(this.state.player, this.ui.selection.uid, uid)
-      sfx.sfxSelect()
       this.ui.selection = null
       this.ui.renderRecruit()
       return
@@ -292,7 +240,7 @@ export class MultiplayerGameController {
       this.ui.renderRecruit()
       return
     }
-    const triggerReward = playMinion(this.state.player, handIdx, boardIndex)
+    const triggerReward = playMinion(this.state.player, handIdx, boardIndex, this.state.uidGen)
     this.ui.selection = null
     if (triggerReward) {
       sfx.sfxTriple()
@@ -314,7 +262,7 @@ export class MultiplayerGameController {
 
   private onTripleRewardPick(defId: string): void {
     const def = CARD_MAP[defId]
-    if (def) applyTripleReward(this.state.player, def)
+    if (def) applyTripleReward(this.state.player, def, this.state.uidGen)
     this.ui.renderRecruit()
   }
 
@@ -328,7 +276,7 @@ export class MultiplayerGameController {
   }
 
   private onRefresh(): void {
-    if (refreshTavern(this.state.player)) {
+    if (refreshTavern(this.state.player, this.state.uidGen)) {
       sfx.sfxRefresh()
       this.ui.renderRecruit()
     }
@@ -353,96 +301,5 @@ export class MultiplayerGameController {
       this.countdownInterval = null
     }
     this.client.surrender()
-  }
-
-  /** 播放战斗动画 */
-  private async playCombatAnimation(result: CombatResult): Promise<void> {
-    let logHtml = ''
-    this.ui.renderCombatStatic(
-      this.state.player.board,
-      this.state.enemy.board,
-      '',
-      '两军交锋',
-      '战鼓擂动，胜负将分……',
-    )
-    await delay(500)
-
-    const needsFullRender = (type: CombatStep['type']) =>
-      type === 'death' || type === 'reborn' || type === 'summon'
-
-    for (const step of result.steps) {
-      logHtml += `<div class="log-entry ${logClass(step.type)}">${step.text}</div>`
-
-      if (step.type === 'attackStart') {
-        const atkEl = getCardEl(step.attackerUid!)
-        const defEl = getCardEl(step.defenderUid!)
-        atkEl?.classList.add(step.side === 'player' ? 'atk-up' : 'atk-down')
-        sfx.sfxAttack()
-        await delay(180)
-        defEl?.classList.add('hit')
-        await delay(220)
-      } else if (step.type === 'hit') {
-        const defEl = getCardEl(step.defenderUid!)
-        defEl?.classList.add('hit')
-        sfx.sfxHit()
-        await delay(220)
-      } else if (step.type === 'shield') {
-        const defEl = getCardEl(step.defenderUid!)
-        defEl?.classList.add('shield-break')
-        sfx.sfxShield()
-        await delay(320)
-      } else if (step.type === 'death') {
-        for (const uid of step.killedUids ?? []) {
-          getCardEl(uid)?.classList.add('dying')
-        }
-        sfx.sfxDeath()
-        await delay(420)
-      } else if (step.type === 'reborn') {
-        sfx.sfxReborn()
-        await delay(120)
-      } else if (step.type === 'summon') {
-        sfx.sfxSummon()
-        await delay(120)
-      } else if (step.type === 'heroDamage') {
-        sfx.sfxHeroDamage()
-        await delay(350)
-      } else {
-        await delay(140)
-      }
-
-      const title = titleFor(step, result)
-      const sub = subFor(step)
-      if (needsFullRender(step.type)) {
-        const summonedUid =
-          step.type === 'summon'
-            ? step.summonedUid
-            : step.type === 'reborn'
-              ? step.rebornUid
-              : undefined
-        this.ui.renderCombatStatic(step.snap.p, step.snap.e, logHtml, title, sub, summonedUid)
-      } else {
-        this.ui.updateCombatHp(step.snap.p, step.snap.e)
-        this.ui.updateCombatLogAndTitle(logHtml, title, sub)
-      }
-      scrollLog()
-    }
-
-    const winTitle =
-      result.winner === 'player' ? '大获全胜' : result.winner === 'enemy' ? '不敌败北' : '势均力敌'
-    const winSub =
-      result.winner === 'player'
-        ? `对敌方英雄造成 ${result.damageToLoser} 点伤害！`
-        : result.winner === 'enemy'
-          ? `我方英雄承受 ${result.damageToLoser} 点伤害`
-          : '双方旗鼓相当，各自退兵'
-    this.ui.renderCombatStatic(
-      result.survivorBoard,
-      result.enemySurvivorBoard,
-      logHtml,
-      winTitle,
-      winSub,
-    )
-    scrollLog()
-    await delay(1300)
   }
 }

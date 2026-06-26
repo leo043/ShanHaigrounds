@@ -2,6 +2,7 @@
 import type { GameState, Minion } from './types'
 import { createSummonMinion, damageMinion } from './game'
 import { calculateSynergies } from './synergy'
+import { cloneBoard } from './shared'
 
 /** 战斗中的 buff 辅助函数（与 game.ts 的 buffMinion 逻辑一致） */
 function combatBuff(m: Minion, atk?: number, hp?: number): void {
@@ -54,19 +55,13 @@ export interface CombatResult {
   enemySurvivorBoard: Minion[] // 敌方存活（已回满血）
 }
 
-function cloneMinion(m: Minion): Minion {
-  return { ...m, keywords: [...m.keywords], effects: m.effects.map((e) => ({ ...e })) }
-}
-function cloneBoard(b: Minion[]): Minion[] {
-  return b.map(cloneMinion)
-}
-
 /**
  * 模拟一次战斗。在副本上进行，不修改 state。
  * 战斗结束后存活随从回满血（战斗中受到的伤害不保留）。
  */
 export function simulateCombat(state: GameState): CombatResult {
   const steps: CombatStep[] = []
+  const uidGen = state.uidGen
   let pBoard: Minion[] = cloneBoard(state.player.board)
   let eBoard: Minion[] = cloneBoard(state.enemy.board)
 
@@ -76,10 +71,14 @@ export function simulateCombat(state: GameState): CombatResult {
   else if (eBoard.length > pBoard.length) turn = 'enemy'
   else turn = Math.random() < 0.5 ? 'player' : 'enemy'
 
-  const snap = (): { p: Minion[]; e: Minion[] } => ({
-    p: cloneBoard(pBoard),
-    e: cloneBoard(eBoard),
-  })
+  let lastSnap: { p: Minion[]; e: Minion[] } | null = null
+  /** 创建快照。force=true 强制新建，否则复用上一次（用于 hit/shield 步骤节省拷贝） */
+  const snap = (force = true): { p: Minion[]; e: Minion[] } => {
+    if (force || !lastSnap) {
+      lastSnap = { p: cloneBoard(pBoard), e: cloneBoard(eBoard) }
+    }
+    return lastSnap
+  }
 
   steps.push({
     type: 'info',
@@ -103,7 +102,7 @@ export function simulateCombat(state: GameState): CombatResult {
             type: 'shield',
             side: 'enemy',
             defenderUid: enemy.uid,
-            snap: snap(),
+            snap: snap(false),
             text: `【法师羁绊】伤害被【${enemy.name}】圣盾抵挡`,
           })
         } else {
@@ -113,7 +112,7 @@ export function simulateCombat(state: GameState): CombatResult {
             side: 'player',
             defenderUid: enemy.uid,
             damage: 1,
-            snap: snap(),
+            snap: snap(false),
             text: `【法师羁绊】对【${enemy.name}】造成 1 点伤害`,
           })
         }
@@ -129,7 +128,7 @@ export function simulateCombat(state: GameState): CombatResult {
             side: 'player',
             defenderUid: victim.uid,
             damage: 999,
-            snap: snap(),
+            snap: snap(false),
             text: `【法师羁绊 Lv.2】随机消灭【${victim.name}】`,
           })
         }
@@ -149,7 +148,7 @@ export function simulateCombat(state: GameState): CombatResult {
             type: 'shield',
             side: 'player',
             defenderUid: ally.uid,
-            snap: snap(),
+            snap: snap(false),
             text: `【敌方法师羁绊】伤害被【${ally.name}】圣盾抵挡`,
           })
         } else {
@@ -159,7 +158,7 @@ export function simulateCombat(state: GameState): CombatResult {
             side: 'enemy',
             defenderUid: ally.uid,
             damage: 1,
-            snap: snap(),
+            snap: snap(false),
             text: `【敌方法师羁绊】对【${ally.name}】造成 1 点伤害`,
           })
         }
@@ -175,7 +174,7 @@ export function simulateCombat(state: GameState): CombatResult {
             side: 'enemy',
             defenderUid: victim.uid,
             damage: 999,
-            snap: snap(),
+            snap: snap(false),
             text: `【敌方法师羁绊 Lv.2】随机消灭【${victim.name}】`,
           })
         }
@@ -199,7 +198,7 @@ export function simulateCombat(state: GameState): CombatResult {
               type: 'shield',
               side: side === 'player' ? 'enemy' : 'player',
               defenderUid: t.uid,
-              snap: snap(),
+              snap: snap(false),
               text: `【${m.name}】战斗开始伤害被【${t.name}】圣盾抵挡`,
             })
           } else {
@@ -209,7 +208,7 @@ export function simulateCombat(state: GameState): CombatResult {
               side,
               defenderUid: t.uid,
               damage: e.damage,
-              snap: snap(),
+              snap: snap(false),
               text: `【${m.name}】战斗开始对【${t.name}】造成 ${e.damage} 点伤害`,
             })
           }
@@ -373,8 +372,8 @@ export function simulateCombat(state: GameState): CombatResult {
     resolveHit(defender, attacker, defSide, steps, snap, false)
 
     // 清理死亡 + 复生 + 亡语
-    pBoard = cleanupDead('player', pBoard, eBoard, steps)
-    eBoard = cleanupDead('enemy', eBoard, pBoard, steps)
+    pBoard = cleanupDead('player', pBoard, eBoard, steps, uidGen)
+    eBoard = cleanupDead('enemy', eBoard, pBoard, steps, uidGen)
 
     // 风怒：如果攻击者还能攻击，不切换回合
     const currentAtkBoard = atkSide === 'player' ? pBoard : eBoard
@@ -441,7 +440,7 @@ function resolveHit(
   defender: Minion,
   atkSide: Side,
   steps: CombatStep[],
-  snap: () => { p: Minion[]; e: Minion[] },
+  snap: (force?: boolean) => { p: Minion[]; e: Minion[] },
   doubleDamage = false,
 ): void {
   if (defender.health <= 0) return
@@ -455,7 +454,7 @@ function resolveHit(
       type: 'shield',
       side: atkSide === 'player' ? 'enemy' : 'player',
       defenderUid: defender.uid,
-      snap: snap(),
+      snap: snap(false),
       text: `【${defender.name}】圣盾破碎，抵消${attacker.keywords.includes('poison') ? '剧毒' : '伤害'}`,
     })
     return
@@ -469,7 +468,7 @@ function resolveHit(
       attackerUid: attacker.uid,
       defenderUid: defender.uid,
       damage: dmg,
-      snap: snap(),
+      snap: snap(false),
       text: `【${attacker.name}】剧毒之刃命中【${defender.name}】，一击毙命！`,
     })
     return
@@ -481,7 +480,7 @@ function resolveHit(
     attackerUid: attacker.uid,
     defenderUid: defender.uid,
     damage: dmg,
-    snap: snap(),
+    snap: snap(false),
     text: `【${defender.name}】受到 ${dmg} 点伤害（剩 ${Math.max(0, defender.health)}）${doubleDamage ? '（刺客双倍）' : ''}`,
   })
 }
@@ -492,6 +491,7 @@ function cleanupDead(
   board: Minion[],
   enemyBoard: Minion[],
   steps: CombatStep[],
+  uidGen?: () => string,
 ): Minion[] {
   const dead = board.filter((m) => m.health <= 0)
   if (dead.length === 0) return board
@@ -500,6 +500,12 @@ function cleanupDead(
     side === 'player'
       ? { p: cloneBoard(arr), e: cloneBoard(enemyBoard) }
       : { p: cloneBoard(enemyBoard), e: cloneBoard(arr) }
+
+  // 预计算每个随从的右邻居（用于亡语相邻 buff），避免复生后位置错乱
+  const rightNeighbor = new Map<Minion, Minion | undefined>()
+  for (let i = 0; i < board.length - 1; i++) {
+    rightNeighbor.set(board[i], board[i + 1])
+  }
 
   // 先按原 board 顺序重建：存活直接保留，死亡的在原位置触发复生/亡语召唤
   const finalBoard: Minion[] = []
@@ -530,7 +536,7 @@ function cleanupDead(
     for (const e of m.effects) {
       if (e.trigger !== 'deathrattle') continue
       if (e.target === 'summonMinion' && e.summon && finalBoard.length < 7) {
-        const s = createSummonMinion(e.summon)
+        const s = createSummonMinion(e.summon, uidGen)
         finalBoard.push(s)
         steps.push({
           type: 'summon',
@@ -577,23 +583,19 @@ function cleanupDead(
             text: `【${m.name}】亡语：给【${left.name}】+${e.buffAttack}/${e.buffHealth ?? 0}`,
           })
         }
-        // 右相邻：board 中下一个存活的随从
-        const boardIdx = board.indexOf(m)
-        for (let j = boardIdx + 1; j < board.length; j++) {
-          if (board[j].health > 0 && e.buffAttack) {
-            const right = board[j]
-            right.attack += e.buffAttack
-            if (e.buffHealth) {
-              right.health += e.buffHealth
-              right.maxHealth += e.buffHealth
-            }
-            steps.push({
-              type: 'info',
-              snap: makeSnapFromArr(finalBoard),
-              text: `【${m.name}】亡语：给【${right.name}】+${e.buffAttack}/${e.buffHealth ?? 0}`,
-            })
-            break
+        // 右相邻：通过预计算的邻居表查找，支持复生场景
+        const right = rightNeighbor.get(m)
+        if (right && (right.health > 0 || right.rebornUsed) && e.buffAttack) {
+          right.attack += e.buffAttack
+          if (e.buffHealth) {
+            right.health += e.buffHealth
+            right.maxHealth += e.buffHealth
           }
+          steps.push({
+            type: 'info',
+            snap: makeSnapFromArr(finalBoard),
+            text: `【${m.name}】亡语：给【${right.name}】+${e.buffAttack}/${e.buffHealth ?? 0}`,
+          })
         }
       } else if (e.target === 'randomAlly' && finalBoard.length > 0) {
         const allies = finalBoard.filter((a) => a.uid !== m.uid)

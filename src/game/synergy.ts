@@ -270,8 +270,26 @@ export function applyClassSynergyBuffs(board: Minion[]): void {
   }
 }
 
+/** 缓存：记录上次应用羁绊时的棋盘指纹，避免无变化时重复撤销+重算 */
+const synergyFingerprintCache = new WeakMap<Minion[], string>()
+
+/** 计算棋盘的羁绊指纹（仅依赖种族/职业组成，不依赖数值） */
+function synergyFingerprint(board: Minion[]): string {
+  const tribeCounts: Record<string, number> = {}
+  const classCounts: Record<string, number> = {}
+  for (const m of board) {
+    tribeCounts[m.tribe] = (tribeCounts[m.tribe] ?? 0) + 1
+    classCounts[m.class] = (classCounts[m.class] ?? 0) + 1
+  }
+  return JSON.stringify({ t: tribeCounts, c: classCounts })
+}
+
 /** 重算羁绊光环（撤销旧的、应用新的），在每次战场变化后调用 */
 export function recalcSynergyAuras(board: Minion[]): void {
+  // 先检查棋盘组成是否变化，没变则跳过
+  const fp = synergyFingerprint(board)
+  if (synergyFingerprintCache.get(board) === fp) return
+
   // 撤销上一轮的羁绊加成
   for (const m of board) {
     m.attack -= m.synergyBuffAttack
@@ -289,4 +307,5 @@ export function recalcSynergyAuras(board: Minion[]): void {
   // 重新计算并应用
   applyTribeSynergyBuffs(board)
   applyClassSynergyBuffs(board)
+  synergyFingerprintCache.set(board, fp)
 }
