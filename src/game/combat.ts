@@ -53,6 +53,7 @@ export interface CombatResult {
   damageToLoser: number
   survivorBoard: Minion[] // 玩方存活（已回满血）
   enemySurvivorBoard: Minion[] // 敌方存活（已回满血）
+  damagedSnap: { p: Minion[]; e: Minion[] } // 战斗结束瞬间的快照（带伤害）
 }
 
 /**
@@ -413,6 +414,9 @@ export function simulateCombat(state: GameState): CombatResult {
   }
   steps.push({ type: 'end', snap: snap(), text: '战斗结束' })
 
+  // 回血前保存带伤害的快照
+  const damagedSnap = { p: cloneBoard(pBoard), e: cloneBoard(eBoard) }
+
   // 关键：战斗后存活随从回满血（战斗伤害不保留），复生状态重置
   for (const m of pBoard) {
     m.health = m.maxHealth
@@ -431,6 +435,7 @@ export function simulateCombat(state: GameState): CombatResult {
     damageToLoser: damage,
     survivorBoard: pBoard,
     enemySurvivorBoard: eBoard,
+    damagedSnap,
   }
 }
 

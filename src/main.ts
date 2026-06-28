@@ -2,42 +2,50 @@
 import './styles/main.css'
 import {
   createGame,
-  buyMinion,
-  sellMinion,
-  playMinion,
-  swapMinions,
-  refreshTavern,
-  freezeTavern,
-  upgradeTavern,
   endRecruitPhase,
   startTurn,
   dealDamageToHero,
   checkGameOver,
   generateTripleReward,
-  applyTripleReward,
 } from './game/game'
-import { simulateCombat } from './game/combat'
 import { runAITurn } from './game/ai'
 import { GameUI, renderHeroSelect, renderMainMenu, renderCodex } from './ui/render'
 import { renderRoomLobby, getMultiplayerClient } from './ui/room'
-import { CARD_MAP, HEROES } from './game/cards'
-import { delay, cloneBoard } from './game/shared'
+import { HEROES } from './game/cards'
+import { delay } from './game/shared'
 import { playCombatAnimation } from './game/combat-anim'
+import { EventBus } from './game/event-bus'
+import { CommandInvoker } from './game/command-invoker'
+import { setupListeners } from './game/listeners'
+import {
+  BuyCommand,
+  SellCommand,
+  PlayToBoardCommand,
+  SwapBoardCommand,
+  MoveBoardCommand,
+  RefreshCommand,
+  FreezeCommand,
+  UpgradeCommand,
+  TripleRewardPickCommand,
+  CombatCommand,
+} from './game/commands'
 import * as sfx from './game/audio'
-import { playRecruitBgm, playCombatBgm, stopBgm } from './game/audio'
+import { playRecruitBgm, stopBgm } from './game/audio'
 
 // ============ 游戏控制器：封装 state 和 ui，消除全局可变状态 ============
 
 class GameController {
   private state: ReturnType<typeof createGame>
   private ui: GameUI
+  private bus: EventBus
+  private invoker: CommandInvoker
 
   constructor(playerHeroId: string, root: HTMLElement) {
     const enemyPool = HEROES.filter((h) => h.id !== playerHeroId)
     const enemyHero = enemyPool[Math.floor(Math.random() * enemyPool.length)]
     this.state = createGame(playerHeroId, enemyHero.id)
-    sfx.sfxSelect()
-    playRecruitBgm()
+    this.bus = new EventBus()
+    this.invoker = new CommandInvoker(this.bus)
     this.ui = new GameUI(this.state, root, {
       onBuy: (uid) => this.onBuy(uid),
       onDropHandToBoard: (handUid, boardIdx) => this.onDropHandToBoard(handUid, boardIdx),
@@ -53,6 +61,9 @@ class GameController {
       onHeroPick: () => {},
       onSurrender: () => this.onSurrender(),
     })
+    setupListeners(this.bus, this.ui)
+    sfx.sfxSelect()
+    playRecruitBgm()
     this.ui.renderRecruit()
   }
 
@@ -61,37 +72,23 @@ class GameController {
   private onBuy(uid: string): void {
     const idx = this.state.player.tavern.findIndex((m) => m.uid === uid)
     if (idx < 0) return
-    buyMinion(this.state.player, idx, this.state.uidGen)
-    sfx.sfxBuy()
-    this.ui.renderRecruit()
+    this.invoker.execute(new BuyCommand(uid, idx, this.state.uidGen), this.state)
   }
 
   private onDropHandToBoard(handUid: string, boardIndex: number): void {
-    const handIdx = this.state.player.hand.findIndex((m) => m.uid === handUid)
-    if (handIdx < 0) return
-    const triggerReward = playMinion(this.state.player, handIdx, boardIndex, this.state.uidGen)
-    if (triggerReward) {
-      sfx.sfxTriple()
+    const cmd = new PlayToBoardCommand(handUid, boardIndex, this.state.uidGen)
+    this.invoker.execute(cmd, this.state)
+    if (cmd.didTriggerReward()) {
       this.showTripleReward()
-    } else {
-      sfx.sfxBuy()
-      this.ui.renderRecruit()
     }
   }
 
   private onSwapBoard(uidA: string, uidB: string): void {
-    swapMinions(this.state.player, uidA, uidB)
-    this.ui.renderRecruit()
+    this.invoker.execute(new SwapBoardCommand(uidA, uidB), this.state)
   }
 
   private onMoveBoardToSlot(uid: string, boardIndex: number): void {
-    const board = this.state.player.board
-    const fromIdx = board.findIndex((m) => m.uid === uid)
-    if (fromIdx < 0 || fromIdx === boardIndex) return
-    const [minion] = board.splice(fromIdx, 1)
-    const insertAt = Math.min(boardIndex, board.length)
-    board.splice(insertAt, 0, minion)
-    this.ui.renderRecruit()
+    this.invoker.execute(new MoveBoardCommand(uid, boardIndex), this.state)
   }
 
   // ============ 三连奖励 ============
@@ -107,106 +104,86 @@ class GameController {
   }
 
   private onTripleRewardPick(defId: string): void {
-    const def = CARD_MAP[defId]
-    if (def) applyTripleReward(this.state.player, def, this.state.uidGen)
-    this.ui.renderRecruit()
+    this.invoker.execute(new TripleRewardPickCommand(defId, this.state.uidGen), this.state)
   }
 
   private onSell(uid: string): void {
-    const idx = this.state.player.board.findIndex((m) => m.uid === uid)
-    if (idx < 0) return
-    sellMinion(this.state.player, idx)
-    sfx.sfxSell()
-    sfx.sfxGoldCoin()
-    this.ui.renderRecruit()
+    this.invoker.execute(new SellCommand(uid), this.state)
   }
 
   private onRefresh(): void {
-    if (refreshTavern(this.state.player, this.state.uidGen)) {
-      sfx.sfxRefresh()
-      this.ui.renderRecruit()
-    }
+    this.invoker.execute(new RefreshCommand(this.state.uidGen), this.state)
   }
 
   private onFreeze(): void {
-    freezeTavern(this.state.player)
-    sfx.sfxFreeze()
-    this.ui.renderRecruit()
+    this.invoker.execute(new FreezeCommand(), this.state)
   }
 
   private onUpgrade(): void {
-    if (upgradeTavern(this.state.player)) {
-      sfx.sfxUpgrade()
-      this.ui.renderRecruit()
-    }
+    this.invoker.execute(new UpgradeCommand(), this.state)
   }
 
   // ============ 战斗流程 ============
 
   private async onCombat(): Promise<void> {
-    // 禁用开战按钮防止重复点击
     const btn = document.getElementById('btn-combat') as HTMLButtonElement | null
     if (btn) btn.disabled = true
 
-    // 1. AI 执行招募
     runAITurn(this.state)
-
-    // 2. 结束招募阶段（触发回合结束 buff）
     endRecruitPhase(this.state)
 
-    // 3. 保存战斗开始时的 board 快照（深拷贝）
-    //    规则：战斗中的死亡不影响我方阵容，下一回合开始时随从应与战斗开始时一致
-    const playerBoardSnapshot = cloneBoard(this.state.player.board)
-    const enemyBoardSnapshot = cloneBoard(this.state.enemy.board)
+    const cmd = new CombatCommand()
+    this.invoker.execute(cmd, this.state)
 
-    // 4. 模拟战斗（在副本上进行，不修改 state）
-    const result = simulateCombat(this.state)
+    const result = cmd.getResult()
+    const playerSnapshot = cmd.getPlayerSnapshot()
+    const enemySnapshot = cmd.getEnemySnapshot()
+    if (!result) return
 
-    // 5. 播放战斗动画
-    sfx.sfxCombatStart()
-    playCombatBgm()
     await playCombatAnimation(this.ui, result, this.state.player.board, this.state.enemy.board)
 
-    // 6. 结算英雄伤害（按战斗胜负）
     if (result.winner === 'player') {
       dealDamageToHero(this.state, 'enemy', result.damageToLoser)
     } else if (result.winner === 'enemy') {
       dealDamageToHero(this.state, 'player', result.damageToLoser)
     }
 
-    // 7. 关键：恢复战斗开始时的阵容（所有随从都在，回满血，复生/圣盾重置）
-    //    战斗中死亡的随从不消失，只有主动出售才会消失
-    for (const m of playerBoardSnapshot) {
-      m.health = m.maxHealth
-      m.rebornUsed = false
-      m.divineShield = m.keywords.includes('divineShield')
-      m.hasAttacked = false
-    }
-    for (const m of enemyBoardSnapshot) {
-      m.health = m.maxHealth
-      m.rebornUsed = false
-      m.divineShield = m.keywords.includes('divineShield')
-      m.hasAttacked = false
-    }
-    this.state.player.board = playerBoardSnapshot
-    this.state.enemy.board = enemyBoardSnapshot
+    // 展示战斗结果状态（剩余随从带伤害）
+    this.ui.renderCombatStatic(
+      result.damagedSnap.p,
+      result.damagedSnap.e,
+      '',
+      result.winner === 'player' ? '胜利' : result.winner === 'enemy' ? '失败' : '平局',
+      `对英雄造成 ${result.damageToLoser} 点伤害`,
+    )
+    await delay(1500)
 
-    // 8. 检查游戏结束
+    // 恢复到回合开始时的阵容
+    for (const m of playerSnapshot) {
+      m.health = m.maxHealth
+      m.rebornUsed = false
+      m.divineShield = m.keywords.includes('divineShield')
+      m.hasAttacked = false
+    }
+    for (const m of enemySnapshot) {
+      m.health = m.maxHealth
+      m.rebornUsed = false
+      m.divineShield = m.keywords.includes('divineShield')
+      m.hasAttacked = false
+    }
+    this.state.player.board = playerSnapshot
+    this.state.enemy.board = enemySnapshot
+
     checkGameOver(this.state)
     if (this.state.phase === 'gameover') {
-      stopBgm()
-      if (this.state.winner === 'player') sfx.sfxVictory()
-      else if (this.state.winner === 'enemy') sfx.sfxDefeat()
-      else sfx.sfxDraw()
+      this.bus.emit('game_over', this.state.winner)
       this.ui.state = this.state
       this.ui.renderGameOver()
       return
     }
 
-    // 9. 进入下一回合
     startTurn(this.state)
-    sfx.sfxTurnStart()
-    playRecruitBgm()
+    this.bus.emit('start_turn')
     this.ui.state = this.state
     this.ui.selection = null
     await delay(700)
