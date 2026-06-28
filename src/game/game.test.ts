@@ -189,7 +189,7 @@ describe('buyMinion / sellMinion', () => {
     expect(p.tavern).toHaveLength(1)
   })
 
-  it('卖出应 +1 金（不超过 maxGold）、从战场移除', () => {
+  it('卖出应 +1 金、从战场移除', () => {
     const p = makePlayer()
     p.gold = 3
     p.maxGold = 10
@@ -199,13 +199,13 @@ describe('buyMinion / sellMinion', () => {
     expect(p.board).toHaveLength(0)
   })
 
-  it('卖出回金不应超过 maxGold', () => {
+  it('卖出回金可超过 maxGold', () => {
     const p = makePlayer()
     p.gold = 10
     p.maxGold = 10
     p.board = [m('demon_imp')]
     sellMinion(p, 0)
-    expect(p.gold).toBe(10) // 已满，不加
+    expect(p.gold).toBe(11)
   })
 })
 

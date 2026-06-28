@@ -150,11 +150,11 @@ export function buyMinion(player: PlayerState, tavernIndex: number, uidGen?: () 
   checkTriple(player, uidGen)
 }
 
-/** 卖出随从（+1 金币，不超过 maxGold） */
+/** 卖出随从（+1 金币） */
 export function sellMinion(player: PlayerState, boardIndex: number): boolean {
   if (boardIndex < 0 || boardIndex >= player.board.length) return false
   player.board.splice(boardIndex, 1)
-  player.gold = Math.min(player.gold + 1, player.maxGold)
+  player.gold += 1
   // 战场变化后重算羁绊光环
   recalcSynergyAuras(player.board)
   return true
@@ -381,9 +381,9 @@ export function startTurn(state: GameState): void {
   const baseGold = goldForTurn(state.turn)
   for (const p of [state.player, state.enemy]) {
     let gold = baseGold
-    // 青龙技能：每回合开始 +1 金（不超过上限）
+    // 青龙技能：每回合开始 +1 金
     if (p.hero.power === 'goldPlusOne') {
-      gold = Math.min(10, gold + 1)
+      gold += 1
     }
     p.gold = gold
     p.maxGold = Math.max(p.maxGold, gold)

@@ -45,10 +45,10 @@ export class MultiplayerGameController {
 
     this.ui = new GameUI(this.state, root, {
       onBuy: (uid) => this.onBuy(uid),
-      onHandClick: (uid) => this.onHandClick(uid),
-      onBoardClick: (uid) => this.onBoardClick(uid),
-      onPlayToSlot: (idx) => this.onPlayToSlot(idx),
-      onSell: () => this.onSell(),
+      onDropHandToBoard: (handUid, boardIdx) => this.onDropHandToBoard(handUid, boardIdx),
+      onSwapBoard: (uidA, uidB) => this.onSwapBoard(uidA, uidB),
+      onMoveBoardToSlot: (uid, boardIdx) => this.onMoveBoardToSlot(uid, boardIdx),
+      onSell: (uid) => this.onSell(uid),
       onRefresh: () => this.onRefresh(),
       onFreeze: () => this.onFreeze(),
       onUpgrade: () => this.onUpgrade(),
@@ -198,50 +198,10 @@ export class MultiplayerGameController {
     this.ui.renderRecruit()
   }
 
-  private onHandClick(uid: string): void {
-    if (this.ui.selection?.type === 'hand' && this.ui.selection.uid === uid) {
-      this.ui.selection = null
-    } else {
-      this.ui.selection = { type: 'hand', uid }
-      sfx.sfxSelect()
-    }
-    this.ui.renderRecruit()
-  }
-
-  private onBoardClick(uid: string): void {
-    if (this.ui.selection?.type === 'hand') {
-      const boardIdx = this.state.player.board.findIndex((m) => m.uid === uid)
-      if (boardIdx >= 0) {
-        this.onPlayToSlot(boardIdx)
-        return
-      }
-    }
-    if (this.ui.selection?.type === 'board' && this.ui.selection.uid === uid) {
-      this.ui.selection = null
-      this.ui.renderRecruit()
-      return
-    }
-    if (this.ui.selection?.type === 'board') {
-      swapMinions(this.state.player, this.ui.selection.uid, uid)
-      this.ui.selection = null
-      this.ui.renderRecruit()
-      return
-    }
-    this.ui.selection = { type: 'board', uid }
-    sfx.sfxSelect()
-    this.ui.renderRecruit()
-  }
-
-  private onPlayToSlot(boardIndex: number): void {
-    if (this.ui.selection?.type !== 'hand') return
-    const handIdx = this.state.player.hand.findIndex((m) => m.uid === this.ui.selection!.uid)
-    if (handIdx < 0) {
-      this.ui.selection = null
-      this.ui.renderRecruit()
-      return
-    }
+  private onDropHandToBoard(handUid: string, boardIndex: number): void {
+    const handIdx = this.state.player.hand.findIndex((m) => m.uid === handUid)
+    if (handIdx < 0) return
     const triggerReward = playMinion(this.state.player, handIdx, boardIndex, this.state.uidGen)
-    this.ui.selection = null
     if (triggerReward) {
       sfx.sfxTriple()
       this.showTripleReward()
@@ -249,6 +209,21 @@ export class MultiplayerGameController {
       sfx.sfxBuy()
       this.ui.renderRecruit()
     }
+  }
+
+  private onSwapBoard(uidA: string, uidB: string): void {
+    swapMinions(this.state.player, uidA, uidB)
+    this.ui.renderRecruit()
+  }
+
+  private onMoveBoardToSlot(uid: string, boardIndex: number): void {
+    const board = this.state.player.board
+    const fromIdx = board.findIndex((m) => m.uid === uid)
+    if (fromIdx < 0 || fromIdx === boardIndex) return
+    const [minion] = board.splice(fromIdx, 1)
+    const insertAt = Math.min(boardIndex, board.length)
+    board.splice(insertAt, 0, minion)
+    this.ui.renderRecruit()
   }
 
   private showTripleReward(): void {
@@ -266,12 +241,11 @@ export class MultiplayerGameController {
     this.ui.renderRecruit()
   }
 
-  private onSell(): void {
-    if (this.ui.selection?.type !== 'board') return
-    const idx = this.state.player.board.findIndex((m) => m.uid === this.ui.selection!.uid)
-    if (idx >= 0) sellMinion(this.state.player, idx)
+  private onSell(uid: string): void {
+    const idx = this.state.player.board.findIndex((m) => m.uid === uid)
+    if (idx < 0) return
+    sellMinion(this.state.player, idx)
     sfx.sfxSell()
-    this.ui.selection = null
     this.ui.renderRecruit()
   }
 

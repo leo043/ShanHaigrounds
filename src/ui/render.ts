@@ -17,10 +17,10 @@ export type Selection = { type: 'hand'; uid: string } | { type: 'board'; uid: st
 
 export interface UIHooks {
   onBuy: (tavernUid: string) => void
-  onHandClick: (uid: string) => void
-  onBoardClick: (uid: string) => void
-  onPlayToSlot: (boardIndex: number) => void
-  onSell: () => void
+  onDropHandToBoard: (handUid: string, boardIndex: number) => void
+  onSwapBoard: (uidA: string, uidB: string) => void
+  onMoveBoardToSlot: (uid: string, boardIndex: number) => void
+  onSell: (uid: string) => void
   onRefresh: () => void
   onFreeze: () => void
   onUpgrade: () => void
@@ -358,13 +358,13 @@ const SYNERGY_COLORS: Record<string, string> = {
   shaman: '#1abc9c',
 }
 
-/** 渲染羁绊面板 HTML */
-function synergyPanelHtml(board: Minion[]): string {
+/** 渲染羁绊图标条 HTML（底部dock，紧凑横向排列） */
+function synergyDockHtml(board: Minion[]): string {
   const synergies = calculateSynergies(board)
   const activeSynergies = synergies.filter((s) => s.count > 0)
 
   if (activeSynergies.length === 0) {
-    return '<div class="synergy-panel"><div class="synergy-title">羁绊</div><div class="synergy-empty">战场无随从</div></div>'
+    return ''
   }
 
   const items = activeSynergies
@@ -375,7 +375,6 @@ function synergyPanelHtml(board: Minion[]): string {
       const color = SYNERGY_COLORS[s.tag] ?? '#888'
       const isActive = s.activeLevel > 0
 
-      // 生成 tooltip 内容：每级效果
       const tag = s.tagType === 'tribe' ? (s.tag as Tribe) : (s.tag as Class)
       const descs =
         s.tagType === 'tribe' ? TRIBE_SYNERGY_DESC[tag as Tribe] : CLASS_SYNERGY_DESC[tag as Class]
@@ -392,39 +391,29 @@ function synergyPanelHtml(board: Minion[]): string {
         `<div class="tt-syn-wrap">${name}（${s.count}）${tooltipLines}</div>`,
       )
 
-      // 阈值进度：显示每个阈值，已激活的高亮
-      const thresholds = s.levelThresholds
-      const progressDots = thresholds
-        .map((t) => {
-          const reached = s.count >= t
-          return `<span class="syn-threshold ${reached ? 'reached' : ''}">${t}</span>`
-        })
-        .join('<span class="syn-sep">›</span>')
-
-      return `<div class="syn-row ${isActive ? 'active' : ''}" data-tooltip="${tooltip}">
-        <div class="syn-icon ${isActive ? 'glow' : ''}" style="background:${isActive ? color : 'rgba(255,255,255,0.12)'};${isActive ? `box-shadow:0 0 10px ${color}88` : ''}">
-          <span class="syn-icon-text">${icon}</span>
+      return `<div class="dock-syn-item ${isActive ? 'active' : ''}" data-tooltip="${tooltip}">
+        <div class="dock-syn-icon ${isActive ? 'glow' : ''}" style="background:${isActive ? color : 'rgba(255,255,255,0.12)'};${isActive ? `box-shadow:0 0 8px ${color}66` : ''}">
+          <span class="dock-syn-icon-text">${icon}</span>
         </div>
-        <div class="syn-info">
-          <div class="syn-top">
-            <span class="syn-count" style="color:${isActive ? color : '#888'}">${s.count}</span>
-            <span class="syn-name">${name}</span>
-          </div>
-          <div class="syn-thresholds">${progressDots}</div>
-        </div>
+        <span class="dock-syn-count" style="color:${isActive ? color : '#888'}">${s.count}</span>
       </div>`
     })
     .join('')
 
-  return `<div class="synergy-panel"><div class="synergy-title">羁绊</div>${items}</div>`
+  return `${items}`
 }
 
 /** 全局 tooltip：监听 mouseover/mouseout，根据 data-tooltip 显示浮窗（只绑定一次） */
 let tooltipBound = false
+let isDragging = false
+let tooltipEl: HTMLDivElement | null = null
+export function setDragging(v: boolean): void {
+  isDragging = v
+  if (v && tooltipEl) tooltipEl.style.display = 'none'
+}
 function bindGlobalTooltip(): void {
   if (tooltipBound) return
   tooltipBound = true
-  let tooltipEl: HTMLDivElement | null = null
   const ensureTooltip = (): HTMLDivElement => {
     if (!tooltipEl) {
       tooltipEl = document.createElement('div')
@@ -434,7 +423,14 @@ function bindGlobalTooltip(): void {
     }
     return tooltipEl
   }
+  const hideTooltip = () => {
+    if (tooltipEl) tooltipEl.style.display = 'none'
+  }
   document.addEventListener('mouseover', (e) => {
+    if (isDragging) {
+      hideTooltip()
+      return
+    }
     const card = (e.target as HTMLElement).closest('[data-tooltip]') as HTMLElement | null
     if (!card) return
     const raw = card.getAttribute('data-tooltip')
@@ -449,27 +445,21 @@ function bindGlobalTooltip(): void {
     const tw = t.offsetWidth
     const th = t.offsetHeight
     const pad = 10
-    // 优先显示在元素右侧
     let left = rect.right + pad
     let top = rect.top + rect.height / 2 - th / 2
-    // 右侧放不下则显示在左侧
     if (left + tw > window.innerWidth - pad) {
       left = rect.left - tw - pad
     }
-    // 左侧也放不下则居中显示在上方
     if (left < pad) {
       left = rect.left + rect.width / 2 - tw / 2
       top = rect.top - th - pad
     }
-    // 上方放不下则显示在下方
     if (top < pad) {
       top = rect.bottom + pad
     }
-    // 底部溢出
     if (top + th > window.innerHeight - pad) {
       top = window.innerHeight - th - pad
     }
-    // 水平边界修正
     if (left < pad) left = pad
     if (left + tw > window.innerWidth - pad) left = window.innerWidth - tw - pad
     t.style.left = left + 'px'
@@ -478,6 +468,9 @@ function bindGlobalTooltip(): void {
   document.addEventListener('mouseout', (e) => {
     const card = (e.target as HTMLElement).closest('[data-tooltip]')
     if (card && tooltipEl) tooltipEl.style.display = 'none'
+  })
+  document.addEventListener('dragover', () => {
+    if (isDragging && tooltipEl) tooltipEl.style.display = 'none'
   })
 }
 
@@ -521,7 +514,7 @@ export class GameUI {
     })
   }
 
-  /** 渲染招募阶段 - 布局：顶部英雄栏+控制 → 酒馆行 → 战场行 → 手牌悬浮底栏 */
+  /** 渲染招募阶段 - 对齐官方布局：英雄+控制顶栏 → 酒馆+战场中间 → 手牌底部 → 羁绊图标条 */
   renderRecruit(): void {
     const s = this.state
     const selUid =
@@ -552,34 +545,27 @@ export class GameUI {
         }),
       )
       .join('')
-    const emptySlot =
-      s.player.board.length < 7
-        ? `<div class="board-slot drop-target" data-slot="board-${s.player.board.length}"></div>`
-        : ''
 
     const canUpgrade = s.player.tavernTier < 6 && s.player.gold >= s.player.upgradeCost
     const hasFreeRefresh =
       s.player.hero.power === 'freeRefreshOnce' && !s.player.hero.freeRefreshUsed
     const canRefresh = hasFreeRefresh || s.player.gold >= 1
     const refreshCost = hasFreeRefresh ? 0 : 1
-    const canSell = this.selection?.type === 'board'
-
-    const hint =
-      this.selection?.type === 'hand'
-        ? '点击战场空位或随从前方放置'
-        : this.selection?.type === 'board'
-          ? '点另一随从交换站位 · 再点取消 · 点卖出'
-          : '点酒馆购买 · 点手牌选中放置 · 点战场调整站位'
 
     this.root.innerHTML = `
-      <!-- ====== 顶部：英雄 + 控制按钮（对齐官方）====== -->
+      <!-- ====== 顶部：英雄 + 控制按钮 ====== -->
       <div class="topbar">
         ${heroHtml(s.enemy, true)}
         <div class="turn-info">第 ${s.turn} 回合 · 招募 · 酒馆${s.player.tavernTier}级</div>
-        ${heroHtml(s.player, false)}
+        <div class="topbar-actions">
+          <button class="topbar-icon-btn" id="btn-mute" title="${isMuted() ? '取消静音' : '静音'}">
+            <span>${isMuted() ? '🔇' : '🔊'}</span>
+          </button>
+          <button class="topbar-icon-btn" id="btn-surrender" title="投降"><span>⚑</span></button>
+        </div>
       </div>
 
-      <!-- 控制行：升级 | 刷新 | 冻结 | 金币 | 静音 | 卖出 | 开战 -->
+      <!-- 控制行：升级 | 刷新 | 冻结 | 金币 | 卖出 | 开战 -->
       <div class="control-row">
         <button class="ctrl-btn ctrl-upgrade" id="btn-upgrade" ${canUpgrade ? '' : 'disabled'} title="升级酒馆">
           <span class="ctrl-icon">★</span>
@@ -593,50 +579,41 @@ export class GameUI {
           <span class="ctrl-icon">❄</span>
           <span class="ctrl-cost">${s.player.frozen ? '✓' : '0'}</span>
         </button>
-        <div class="gold-display"><span class="gold-coin"></span>${s.player.gold}/${s.player.maxGold}</div>
+        <div class="gold-display"><span class="gold-coin"></span>${s.player.gold}</div>
+        <div class="synergy-dock" id="synergy-panel">
+          ${synergyDockHtml(s.player.board)}
+        </div>
         <div class="spacer"></div>
-        <button class="ctrl-btn ctrl-surrender" id="btn-surrender" title="投降"><span class="ctrl-icon">⚑</span></button>
-        <button class="ctrl-btn ctrl-mute" id="btn-mute" title="${isMuted() ? '取消静音' : '静音'}">
-          <span class="ctrl-icon">${isMuted() ? '🔇' : '🔊'}</span>
-        </button>
-        <button class="ctrl-btn ctrl-sell" id="btn-sell" ${canSell ? '' : 'disabled'} title="卖出选中随从">
-          <span class="ctrl-icon">$</span><span>+1</span>
-        </button>
         <button class="ctrl-btn ctrl-combat btn-primary" id="btn-combat">⚔ 开战！</button>
       </div>
 
-      <!-- ====== 主区域：酒馆 → 战场 → 手牌 ====== -->
+      <!-- ====== 主区域：垂直堆叠（对齐官方） ====== -->
       <div class="main-area recruit-layout">
-        <!-- 羁绊面板（左侧） -->
-        <div class="synergy-sidebar" id="synergy-panel">
-          ${synergyPanelHtml(s.player.board)}
+        <!-- 酒馆区 -->
+        <div class="tavern-section">
+          <div class="section-header">
+            <span class="section-label">酒馆</span>
+            <span class="section-sub">酒馆${s.player.tavernTier}级</span>
+          </div>
+          <div class="tavern-cards" id="tavern-cards">${tavernCards || '<span class="empty-row">暂无商品，点击刷新</span>'}</div>
         </div>
 
-        <!-- 中间区域 -->
-        <div class="recruit-center">
-          <!-- 酒馆行（在上方！） -->
-          <div class="tavern-row">
-            <div class="row-label">酒馆商店</div>
-            <div class="tavern-cards" id="tavern-cards">${tavernCards || '<span class="empty-row">暂无商品，点击刷新</span>'}</div>
+        <!-- 战场区 -->
+        <div class="board-section">
+          <div class="section-header">
+            <span class="section-label">我方阵容</span>
+            <span class="section-sub">${s.player.board.length}/7</span>
           </div>
+          <div class="board-zone" id="player-board">${boardCards}</div>
+        </div>
 
-          <!-- 我方战场 -->
-          <div class="board-row">
-            <div class="row-label">我方阵容</div>
-            <div class="board-zone" id="player-board">${boardCards}${emptySlot}</div>
+        <!-- 手牌区（底部） -->
+        <div class="hand-section">
+          <div class="section-header">
+            <span class="section-label">手牌</span>
+            <span class="section-sub">${s.player.hand.length}/10</span>
           </div>
-
-          <!-- 提示信息 -->
-          <div class="hint-bar">
-            <span>${hint}</span>
-            <span class="enemy-tag">敌方备战中 · 酒馆${s.enemy.tavernTier}级 · 棋子${s.enemy.board.length}/7</span>
-          </div>
-
-          <!-- 手牌区（底部悬浮） -->
-          <div class="hand-row">
-            <div class="row-label">手牌 (${s.player.hand.length}/10)</div>
-            <div class="hand-zone" id="player-hand">${handCards || '<span class="empty-hand">手牌为空</span>'}</div>
-          </div>
+          <div class="hand-zone" id="player-hand">${handCards || '<span class="empty-hand">手牌为空</span>'}</div>
         </div>
       </div>
     `
@@ -645,30 +622,194 @@ export class GameUI {
 
   private bindRecruitEvents(): void {
     const root = this.root
-    root.querySelector('#tavern-cards')?.addEventListener('click', (e) => {
-      const card = (e.target as HTMLElement).closest('.card') as HTMLElement | null
-      if (card?.dataset.uid) this.hooks.onBuy(card.dataset.uid)
+
+    // --- 拖拽交互 ---
+    const clearDragOver = () => {
+      root.querySelectorAll('.drag-over').forEach((el) => el.classList.remove('drag-over'))
+    }
+
+    // 酒馆卡牌拖出
+    root.querySelector('#tavern-cards')?.addEventListener('dragstart', (e: Event) => {
+      const de = e as DragEvent
+      const card = (de.target as HTMLElement).closest('.card') as HTMLElement | null
+      if (!card?.dataset.uid) return
+      de.dataTransfer!.setData(
+        'text/plain',
+        JSON.stringify({ source: 'tavern', uid: card.dataset.uid }),
+      )
+      card.classList.add('dragging')
+      setDragging(true)
     })
-    root.querySelector('#player-hand')?.addEventListener('click', (e) => {
+    root.querySelector('#tavern-cards')?.addEventListener('dragend', (e: Event) => {
       const card = (e.target as HTMLElement).closest('.card') as HTMLElement | null
-      if (card?.dataset.uid) this.hooks.onHandClick(card.dataset.uid)
+      if (card) card.classList.remove('dragging')
+      clearDragOver()
+      setDragging(false)
     })
-    root.querySelector('#player-board')?.addEventListener('click', (e) => {
-      const card = (e.target as HTMLElement).closest('.card') as HTMLElement | null
-      if (card?.dataset.uid) {
-        this.hooks.onBoardClick(card.dataset.uid)
-      } else {
-        const slot = (e.target as HTMLElement).closest('[data-slot]') as HTMLElement | null
-        if (slot?.dataset.slot) {
-          const idx = parseInt(slot.dataset.slot.replace('board-', ''), 10)
-          this.hooks.onPlayToSlot(idx)
-        }
+
+    // 手牌区域：接受酒馆拖入（购买）；手牌卡牌可拖出
+    const handZone = root.querySelector('#player-hand')
+    handZone?.addEventListener('dragover', (e: Event) => {
+      const raw = (root.querySelector('#tavern-cards') as HTMLElement)?.querySelector('.dragging')
+      if (raw) {
+        e.preventDefault()
+        handZone.classList.add('drag-over')
       }
     })
+    handZone?.addEventListener('dragleave', () => handZone.classList.remove('drag-over'))
+    handZone?.addEventListener('drop', (e: Event) => {
+      e.preventDefault()
+      handZone.classList.remove('drag-over')
+      try {
+        const data = JSON.parse((e as DragEvent).dataTransfer!.getData('text/plain'))
+        if (data.source === 'tavern') this.hooks.onBuy(data.uid)
+      } catch {
+        /* ignore */
+      }
+    })
+
+    // 手牌卡牌拖出
+    root.querySelector('#player-hand')?.addEventListener('dragstart', (e: Event) => {
+      const de = e as DragEvent
+      const card = (de.target as HTMLElement).closest('.card') as HTMLElement | null
+      if (!card?.dataset.uid) return
+      de.dataTransfer!.setData(
+        'text/plain',
+        JSON.stringify({ source: 'hand', uid: card.dataset.uid }),
+      )
+      card.classList.add('dragging')
+      setDragging(true)
+    })
+    root.querySelector('#player-hand')?.addEventListener('dragend', (e: Event) => {
+      const card = (e.target as HTMLElement).closest('.card') as HTMLElement | null
+      if (card) card.classList.remove('dragging')
+      clearDragOver()
+      setDragging(false)
+    })
+
+    // 战场区域：接受手牌拖入（上场）和战场内拖拽（换位）
+    const boardZone = root.querySelector('#player-board')
+    let currentDropIdx = -999
+    const clearDropIndicators = () => {
+      boardZone?.querySelectorAll<HTMLElement>('.drop-indicator').forEach((el) => el.remove())
+      currentDropIdx = -999
+    }
+    const getBoardDropIndex = (de: DragEvent, zone: HTMLElement): number => {
+      const cards = Array.from(zone.querySelectorAll<HTMLElement>('.card[data-zone="board"]'))
+      const dragging = zone.querySelector<HTMLElement>('.dragging')
+      const valid = cards.filter((c) => c !== dragging)
+      if (valid.length === 0) return 0
+      const x = de.clientX
+      for (let i = 0; i < valid.length; i++) {
+        const rect = valid[i].getBoundingClientRect()
+        if (x < rect.left + rect.width / 2) return i
+      }
+      return valid.length
+    }
+    const showDropIndicator = (idx: number) => {
+      if (idx === currentDropIdx) return
+      clearDropIndicators()
+      const cards = Array.from(boardZone!.querySelectorAll<HTMLElement>('.card[data-zone="board"]'))
+      const ph = document.createElement('div')
+      ph.className = 'drop-indicator'
+      if (idx < cards.length) {
+        boardZone!.insertBefore(ph, cards[idx])
+      } else {
+        boardZone!.appendChild(ph)
+      }
+      currentDropIdx = idx
+    }
+    boardZone?.addEventListener('dragover', (e: Event) => {
+      const de = e as DragEvent
+      const raw = root.querySelector('.dragging')
+      if (!raw) return
+      const zone = (raw as HTMLElement).dataset.zone
+      if (zone === 'hand' || zone === 'board') {
+        e.preventDefault()
+        boardZone.classList.add('drag-over')
+        // 先清再量再建：清除旧占位 → 测量干净的 bounding rect → 只在位置变化时重建
+        boardZone.querySelectorAll<HTMLElement>('.drop-indicator').forEach((el) => el.remove())
+        const idx = getBoardDropIndex(de, boardZone as HTMLElement)
+        showDropIndicator(idx)
+      }
+    })
+    boardZone?.addEventListener('dragleave', (e: Event) => {
+      if (!boardZone.contains((e as DragEvent).relatedTarget as Node)) {
+        boardZone.classList.remove('drag-over')
+        clearDropIndicators()
+      }
+    })
+    boardZone?.addEventListener('drop', (e: Event) => {
+      e.preventDefault()
+      boardZone.classList.remove('drag-over')
+      clearDropIndicators()
+      try {
+        const de = e as DragEvent
+        const data = JSON.parse(de.dataTransfer!.getData('text/plain'))
+        const boardIndex = getBoardDropIndex(de, boardZone as HTMLElement)
+
+        if (data.source === 'hand') {
+          this.hooks.onDropHandToBoard(data.uid, boardIndex)
+        } else if (data.source === 'board') {
+          const targetCard = (de.target as HTMLElement).closest(
+            '.card[data-zone="board"]',
+          ) as HTMLElement | null
+          if (targetCard?.dataset.uid && targetCard.dataset.uid !== data.uid) {
+            this.hooks.onSwapBoard(data.uid, targetCard.dataset.uid)
+          } else {
+            this.hooks.onMoveBoardToSlot(data.uid, boardIndex)
+          }
+        }
+      } catch {
+        /* ignore */
+      }
+    })
+
+    // 战场卡牌拖出
+    root.querySelector('#player-board')?.addEventListener('dragstart', (e: Event) => {
+      const de = e as DragEvent
+      const card = (de.target as HTMLElement).closest('.card') as HTMLElement | null
+      if (!card?.dataset.uid) return
+      de.dataTransfer!.setData(
+        'text/plain',
+        JSON.stringify({ source: 'board', uid: card.dataset.uid }),
+      )
+      card.classList.add('dragging')
+      setDragging(true)
+    })
+    root.querySelector('#player-board')?.addEventListener('dragend', (e: Event) => {
+      const card = (e.target as HTMLElement).closest('.card') as HTMLElement | null
+      if (card) card.classList.remove('dragging')
+      clearDragOver()
+      clearDropIndicators()
+      setDragging(false)
+    })
+
+    // 酒馆区域：接受战场卡拖入（卖出）
+    const tavernZone = root.querySelector('#tavern-cards')
+    tavernZone?.addEventListener('dragover', (e: Event) => {
+      const raw = root.querySelector('.dragging')
+      if ((raw as HTMLElement)?.dataset.zone === 'board') {
+        e.preventDefault()
+        tavernZone.classList.add('drag-over')
+      }
+    })
+    tavernZone?.addEventListener('dragleave', () => tavernZone.classList.remove('drag-over'))
+    tavernZone?.addEventListener('drop', (e: Event) => {
+      e.preventDefault()
+      tavernZone.classList.remove('drag-over')
+      try {
+        const data = JSON.parse((e as DragEvent).dataTransfer!.getData('text/plain'))
+        if (data.source === 'board') this.hooks.onSell(data.uid)
+      } catch {
+        /* ignore */
+      }
+    })
+
+    // 按钮事件（保持不变）
     root.querySelector('#btn-refresh')?.addEventListener('click', () => this.hooks.onRefresh())
     root.querySelector('#btn-freeze')?.addEventListener('click', () => this.hooks.onFreeze())
     root.querySelector('#btn-upgrade')?.addEventListener('click', () => this.hooks.onUpgrade())
-    root.querySelector('#btn-sell')?.addEventListener('click', () => this.hooks.onSell())
     root.querySelector('#btn-surrender')?.addEventListener('click', () => {
       if (confirm('确定要投降吗？')) this.hooks.onSurrender()
     })
@@ -679,7 +820,7 @@ export class GameUI {
     })
   }
 
-  /** 渲染战斗阶段（双方棋盘上下对峙 + 右侧日志） */
+  /** 渲染战斗阶段（对齐官方：敌方英雄+战场在上，我方战场+英雄在下，日志overlay） */
   renderCombatStatic(
     playerBoard: Minion[],
     enemyBoard: Minion[],
@@ -698,30 +839,44 @@ export class GameUI {
 
     this.root.innerHTML = `
       <div class="topbar">
-        ${heroHtml(s.enemy, true)}
-        <div class="turn-info">第 ${s.turn} 回合 · 战斗中</div>
-        ${heroHtml(s.player, false)}
+        <div class="topbar-left-info">
+          <span class="topbar-phase-label">第 ${s.turn} 回合 · 战斗中</span>
+        </div>
+        <div class="topbar-actions">
+          <button class="topbar-icon-btn" id="btn-mute" title="${isMuted() ? '取消静音' : '静音'}">
+            <span>${isMuted() ? '🔇' : '🔊'}</span>
+          </button>
+          <button class="topbar-icon-btn" id="btn-surrender" title="投降"><span>⚑</span></button>
+        </div>
       </div>
       <div class="main-area combat-layout">
-        <div class="synergy-sidebar" id="synergy-panel">
-          ${synergyPanelHtml(s.player.board)}
+        <!-- 敌方区域：英雄 + 战场 -->
+        <div class="combat-half combat-enemy-half">
+          <div class="combat-hero-bar enemy">${heroHtml(s.enemy, true)}</div>
+          <div class="board-zone enemy" id="board-enemy">${eHtml || '<span class="empty-hint">空</span>'}</div>
         </div>
-        <div class="combat-center-area">
-          <div class="combat-side combat-enemy">
-            <div class="row-label">敌阵</div>
-            <div class="board-zone enemy" id="board-enemy">${eHtml || '<span class="empty-hint">空</span>'}</div>
-          </div>
-          <div class="combat-center">
-            <div class="message-title">${title}</div>
-            <div class="message-sub">${sub}</div>
-          </div>
-          <div class="combat-side combat-player">
-            <div class="row-label">我阵</div>
-            <div class="board-zone" id="player-board">${pHtml || '<span class="empty-hint">空</span>'}</div>
-          </div>
+
+        <!-- 中间战斗信息 -->
+        <div class="combat-center">
+          <div class="message-title">${title}</div>
+          <div class="message-sub">${sub}</div>
         </div>
-        <div class="combat-log-sidebar open" id="combat-log-sidebar">
-          <button class="log-toggle-btn" id="log-toggle">▸ 日志</button>
+
+        <!-- 我方区域：战场 + 英雄 -->
+        <div class="combat-half combat-player-half">
+          <div class="board-zone" id="player-board">${pHtml || '<span class="empty-hint">空</span>'}</div>
+          <div class="combat-hero-bar player">${heroHtml(s.player, false)}</div>
+        </div>
+      </div>
+
+      <!-- 日志按钮 + 浮窗 -->
+      <button class="combat-log-toggle" id="log-toggle">日志</button>
+      <div class="combat-log-overlay" id="combat-log-sidebar">
+        <div class="combat-log-panel">
+          <div class="combat-log-header">
+            <span>战斗日志</span>
+            <button class="combat-log-close" id="log-close">✕</button>
+          </div>
           <div class="combat-log" id="combat-log">${logHtml}</div>
         </div>
       </div>
@@ -732,10 +887,13 @@ export class GameUI {
   private bindLogToggle(): void {
     const sidebar = this.root.querySelector('#combat-log-sidebar') as HTMLElement | null
     const btn = this.root.querySelector('#log-toggle') as HTMLElement | null
+    const closeBtn = this.root.querySelector('#log-close') as HTMLElement | null
     if (!sidebar || !btn) return
     btn.addEventListener('click', () => {
       sidebar.classList.toggle('open')
-      btn.textContent = sidebar.classList.contains('open') ? '▸ 日志' : '◂ 日志'
+    })
+    closeBtn?.addEventListener('click', () => {
+      sidebar.classList.remove('open')
     })
   }
 

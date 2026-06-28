@@ -132,10 +132,11 @@ export function minionHtml(
     .filter(Boolean)
     .join(' ')
   const zoneAttr = opts.zone ? `data-zone="${opts.zone}"` : ''
+  const dragAttr = opts.zone && opts.zone !== 'combat' ? 'draggable="true"' : ''
   // tooltip 通过 data-tooltip 属性携带，由全局 mouseover 处理显示
   const tooltipData = escapeAttr(minionTooltipHtml(m, opts.board))
 
-  return `<div class="${cls}" data-uid="${m.uid}" ${zoneAttr} data-tooltip="${tooltipData}">
+  return `<div class="${cls}" ${dragAttr} data-uid="${m.uid}" ${zoneAttr} data-tooltip="${tooltipData}">
     ${m.tripleRewardPending ? '<div class="triple-badge">奖</div>' : ''}
     ${floor}
     ${aura}
