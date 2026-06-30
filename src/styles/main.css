@@ -37,8 +37,6 @@ body {
 #app {
   width: 100vw;
   height: 100vh;
-  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
-    env(safe-area-inset-left);
   background:
     radial-gradient(ellipse at top, rgba(201, 161, 74, 0.15), transparent 60%),
     radial-gradient(ellipse at bottom, rgba(192, 57, 43, 0.08), transparent 60%),
@@ -47,6 +45,8 @@ body {
   flex-direction: column;
   position: relative;
   overflow: hidden;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
 }
 #app::before {
   content: '';
