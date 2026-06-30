@@ -435,7 +435,7 @@ export const HEROES: Hero[] = [
     armor: 10,
     power: 'armorStart',
     powerName: '玄甲',
-    powerDesc: '开局额外获得 10 点护甲',
+    powerDesc: '额外获得 10 点护甲',
   },
   {
     id: 'hero_zhuque',
@@ -445,7 +445,7 @@ export const HEROES: Hero[] = [
     armor: 0,
     power: 'nirvana',
     powerName: '涅槃',
-    powerDesc: '首次死亡时以 1 点生命复活',
+    powerDesc: '首次死亡以 1 生命复活',
   },
   {
     id: 'hero_baihu',
@@ -455,7 +455,7 @@ export const HEROES: Hero[] = [
     armor: 0,
     power: 'freeRefreshOnce',
     powerName: '虎啸',
-    powerDesc: '每回合首次刷新酒馆免费',
+    powerDesc: '每回合首次刷新免费',
   },
   {
     id: 'hero_qinglong',
@@ -465,7 +465,7 @@ export const HEROES: Hero[] = [
     armor: 0,
     power: 'goldPlusOne',
     powerName: '东来',
-    powerDesc: '每回合开始额外获得 1 金',
+    powerDesc: '每回合获得 1 金',
   },
   {
     id: 'hero_qilin',
@@ -475,7 +475,7 @@ export const HEROES: Hero[] = [
     armor: 2,
     power: 'startTier2',
     powerName: '赐福',
-    powerDesc: '开局酒馆直接 2 级（节省升级费）',
+    powerDesc: '开局酒馆直接 2 级',
   },
 ]
 
