@@ -14,9 +14,9 @@
   --tribe-demon: #7b4b94;
   --tribe-spirit: #c9a14a;
   --shadow: rgba(43, 38, 32, 0.25);
-  --font-calligraphy: 'Ma Shan Zheng', 'STKaiti', 'KaiTi', 'Kaiti SC', cursive;
-  --font-serif: 'ZCOOL XiaoWei', 'Noto Serif SC', 'Songti SC', 'SimSun', serif;
-  --font-sans: 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', 'Hiragino Sans GB', sans-serif;
+  --font-calligraphy: 'Ma Shan Zheng', 'LXGW WenKai', 'STKaiti', 'KaiTi', cursive;
+  --font-serif: 'LXGW WenKai', 'Noto Serif SC', 'Songti SC', serif;
+  --font-sans: 'LXGW WenKai', 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
 }
 
 * {
