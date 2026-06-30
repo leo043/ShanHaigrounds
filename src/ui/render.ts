@@ -858,6 +858,7 @@ export class GameUI {
     const onTouchStart = (e: TouchEvent) => {
       const card = getTouchCard(e.target as HTMLElement)
       if (!card?.dataset.uid) return
+      e.preventDefault()
       const zone = card.dataset.zone as 'tavern' | 'hand' | 'board'
       const touch = e.touches[0]
 
@@ -975,7 +976,7 @@ export class GameUI {
     for (const sel of ['#tavern-cards', '#player-hand', '#player-board']) {
       root
         .querySelector(sel)
-        ?.addEventListener('touchstart', onTouchStart as EventListener, { passive: true })
+        ?.addEventListener('touchstart', onTouchStart as EventListener, { passive: false })
       root
         .querySelector(sel)
         ?.addEventListener('touchmove', onTouchMove as EventListener, { passive: false })
