@@ -82,7 +82,6 @@ export function renderMainMenu(
   root: HTMLElement,
   onAdventure: () => void,
   onCodex: () => void,
-  onRoom: () => void,
 ): void {
   root.innerHTML = `
     <div class="main-menu-overlay">
@@ -99,17 +98,11 @@ export function renderMainMenu(
           <div class="menu-card-title">随从图鉴</div>
           <div class="menu-card-desc">浏览所有随从卡牌，了解技能详情</div>
         </div>
-        <div class="main-menu-card" data-action="room">
-          <div class="menu-card-icon">🏠</div>
-          <div class="menu-card-title">创建房间</div>
-          <div class="menu-card-desc">与好友在线对战</div>
-        </div>
       </div>
     </div>
   `
   root.querySelector('[data-action="adventure"]')?.addEventListener('click', onAdventure)
   root.querySelector('[data-action="codex"]')?.addEventListener('click', onCodex)
-  root.querySelector('[data-action="room"]')?.addEventListener('click', onRoom)
 }
 
 /** 渲染随从图鉴 */
@@ -805,6 +798,183 @@ export class GameUI {
         /* ignore */
       }
     })
+
+    // ===== 触摸拖拽支持（Android WebView） =====
+    let touchDragData: {
+      source: 'tavern' | 'hand' | 'board'
+      uid: string
+      clone: HTMLElement
+      startX: number
+      startY: number
+      timer: ReturnType<typeof setTimeout>
+      active: boolean
+    } | null = null
+    const LONG_PRESS_MS = 300
+
+    const getTouchCard = (el: HTMLElement): HTMLElement | null => {
+      return el.closest('.card') as HTMLElement | null
+    }
+
+    const getDropTarget = (x: number, y: number): { zone: string; index: number } | null => {
+      const handZone = root.querySelector('#player-hand') as HTMLElement | null
+      const boardZone = root.querySelector('#player-board') as HTMLElement | null
+      const tavernZone = root.querySelector('#tavern-cards') as HTMLElement | null
+
+      // Check hand zone
+      if (handZone) {
+        const r = handZone.getBoundingClientRect()
+        if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) {
+          return { zone: 'hand', index: 0 }
+        }
+      }
+      // Check board zone
+      if (boardZone) {
+        const r = boardZone.getBoundingClientRect()
+        if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) {
+          const cards = Array.from(
+            boardZone.querySelectorAll<HTMLElement>('.card[data-zone="board"]'),
+          )
+          let idx = cards.length
+          for (let i = 0; i < cards.length; i++) {
+            const cr = cards[i].getBoundingClientRect()
+            if (x < cr.left + cr.width / 2) {
+              idx = i
+              break
+            }
+          }
+          return { zone: 'board', index: idx }
+        }
+      }
+      // Check tavern zone (for selling)
+      if (tavernZone) {
+        const r = tavernZone.getBoundingClientRect()
+        if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) {
+          return { zone: 'tavern', index: 0 }
+        }
+      }
+      return null
+    }
+
+    const onTouchStart = (e: TouchEvent) => {
+      const card = getTouchCard(e.target as HTMLElement)
+      if (!card?.dataset.uid) return
+      const zone = card.dataset.zone as 'tavern' | 'hand' | 'board'
+      const touch = e.touches[0]
+
+      touchDragData = {
+        source: zone,
+        uid: card.dataset.uid,
+        clone: null as unknown as HTMLElement,
+        startX: touch.clientX,
+        startY: touch.clientY,
+        timer: setTimeout(() => {
+          if (!touchDragData) return
+          // Long press confirmed — start drag
+          const c = card.cloneNode(true) as HTMLElement
+          c.classList.add('dragging')
+          c.style.position = 'fixed'
+          c.style.zIndex = '9999'
+          c.style.pointerEvents = 'none'
+          c.style.opacity = '0.85'
+          c.style.width = card.offsetWidth + 'px'
+          c.style.transform = 'scale(1.1)'
+          c.style.left = touch.clientX - card.offsetWidth / 2 + 'px'
+          c.style.top = touch.clientY - card.offsetHeight / 2 + 'px'
+          document.body.appendChild(c)
+          touchDragData.clone = c
+          touchDragData.active = true
+          card.classList.add('dragging')
+          setDragging(true)
+          if (tooltipEl) tooltipEl.style.display = 'none'
+        }, LONG_PRESS_MS),
+        active: false,
+      }
+    }
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (!touchDragData) return
+      const touch = e.touches[0]
+      const dx = Math.abs(touch.clientX - touchDragData.startX)
+      const dy = Math.abs(touch.clientY - touchDragData.startY)
+      // Cancel long press if moved too far before activation
+      if (!touchDragData.active && (dx > 10 || dy > 10)) {
+        clearTimeout(touchDragData.timer)
+        touchDragData = null
+        return
+      }
+      if (!touchDragData.active) return
+      e.preventDefault()
+      touchDragData.clone.style.left = touch.clientX - touchDragData.clone.offsetWidth / 2 + 'px'
+      touchDragData.clone.style.top = touch.clientY - touchDragData.clone.offsetHeight / 2 + 'px'
+
+      // Highlight drop zone
+      clearDragOver()
+      const target = getDropTarget(touch.clientX, touch.clientY)
+      if (target) {
+        const zoneEl =
+          target.zone === 'hand'
+            ? root.querySelector('#player-hand')
+            : target.zone === 'board'
+              ? root.querySelector('#player-board')
+              : root.querySelector('#tavern-cards')
+        zoneEl?.classList.add('drag-over')
+      }
+    }
+
+    const onTouchEnd = (e: TouchEvent) => {
+      if (!touchDragData) return
+      clearTimeout(touchDragData.timer)
+      if (!touchDragData.active) {
+        touchDragData = null
+        return
+      }
+      const touch = e.changedTouches[0]
+      const target = getDropTarget(touch.clientX, touch.clientY)
+
+      // Cleanup
+      touchDragData.clone.remove()
+      const origCard = root.querySelector(`.card[data-uid="${touchDragData.uid}"]`)
+      origCard?.classList.remove('dragging')
+      clearDragOver()
+      clearDropIndicators()
+      setDragging(false)
+
+      if (target) {
+        const { source, uid } = touchDragData
+        if (source === 'tavern' && target.zone === 'hand') {
+          this.hooks.onBuy(uid)
+        } else if (source === 'hand' && target.zone === 'board') {
+          this.hooks.onDropHandToBoard(uid, target.index)
+        } else if (source === 'board' && target.zone === 'board') {
+          // Find card at target index to swap
+          const boardCards = Array.from(
+            root.querySelectorAll('#player-board .card[data-zone="board"]'),
+          )
+          const targetCard = boardCards[target.index] as HTMLElement | null
+          if (targetCard?.dataset.uid && targetCard.dataset.uid !== uid) {
+            this.hooks.onSwapBoard(uid, targetCard.dataset.uid)
+          } else {
+            this.hooks.onMoveBoardToSlot(uid, target.index)
+          }
+        } else if (source === 'board' && target.zone === 'tavern') {
+          this.hooks.onSell(uid)
+        }
+      }
+      touchDragData = null
+    }
+
+    // Attach touch listeners to card zones
+    for (const sel of ['#tavern-cards', '#player-hand', '#player-board']) {
+      root
+        .querySelector(sel)
+        ?.addEventListener('touchstart', onTouchStart as EventListener, { passive: true })
+      root
+        .querySelector(sel)
+        ?.addEventListener('touchmove', onTouchMove as EventListener, { passive: false })
+      root
+        .querySelector(sel)
+        ?.addEventListener('touchend', onTouchEnd as EventListener, { passive: true })
+    }
 
     // 按钮事件（保持不变）
     root.querySelector('#btn-refresh')?.addEventListener('click', () => this.hooks.onRefresh())

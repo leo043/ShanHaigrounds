@@ -10,7 +10,6 @@ import {
 } from './game/game'
 import { runAITurn } from './game/ai'
 import { GameUI, renderHeroSelect, renderMainMenu, renderCodex } from './ui/render'
-import { renderRoomLobby, getMultiplayerClient } from './ui/room'
 import { HEROES } from './game/cards'
 import { delay } from './game/shared'
 import { playCombatAnimation } from './game/combat-anim'
@@ -210,7 +209,6 @@ function showMainMenu(): void {
     appRoot,
     () => showHeroSelect(),
     () => showCodex(),
-    () => showRoomSelect(),
   )
 }
 
@@ -226,99 +224,6 @@ function showHeroSelect(): void {
 
 function showCodex(): void {
   renderCodex(appRoot, () => showMainMenu())
-}
-
-function showRoomSelect(): void {
-  appRoot.innerHTML = `
-    <div class="room-select-overlay">
-      <div class="room-lobby-card">
-        <div class="room-lobby-back" id="room-select-back">← 返回</div>
-        <div class="room-lobby-title">多人对战</div>
-        <div class="room-select-cards">
-          <div class="main-menu-card" data-action="create">
-            <div class="menu-card-icon">🏠</div>
-            <div class="menu-card-title">创建房间</div>
-            <div class="menu-card-desc">邀请好友加入你的房间</div>
-          </div>
-          <div class="main-menu-card" data-action="join">
-            <div class="menu-card-icon">🚪</div>
-            <div class="menu-card-title">加入房间</div>
-            <div class="menu-card-desc">输入房间号加入好友的对局</div>
-          </div>
-        </div>
-      </div>
-    </div>
-  `
-  appRoot.querySelector('#room-select-back')?.addEventListener('click', showMainMenu)
-  appRoot
-    .querySelector('[data-action="create"]')
-    ?.addEventListener('click', () => showRoomLobby('create'))
-  appRoot
-    .querySelector('[data-action="join"]')
-    ?.addEventListener('click', () => showRoomLobby('join'))
-}
-
-function showRoomLobby(mode: 'create' | 'join'): void {
-  let pickedHero = false
-
-  renderRoomLobby(appRoot, mode, {
-    onConnected: () => {},
-    onEnemyJoined: () => {
-      // 对手加入，显示英雄选择
-      showMultiplayerHeroSelect()
-    },
-    onEnemyPicked: (_heroId) => {
-      // 对手选了英雄，如果自己还没选，提示选择
-    },
-    onCountdown: () => {},
-    onCombatStart: (_boards) => {
-      // 进入战斗
-      const client = getMultiplayerClient(appRoot)
-      if (client && !pickedHero) {
-        // 如果还没选英雄，用随机英雄
-        const randomHero = HEROES[Math.floor(Math.random() * HEROES.length)]
-        pickedHero = true
-        client.pickHero(randomHero.id)
-        // 等待服务器发 combat_start
-      }
-    },
-    onNextTurn: () => {},
-    onOpponentLeft: () => {
-      setTimeout(() => showMainMenu(), 1500)
-    },
-    onError: () => {},
-    onBack: () => showMainMenu(),
-  })
-}
-
-function showMultiplayerHeroSelect(): void {
-  renderHeroSelect(
-    appRoot,
-    (heroId) => {
-      const client = getMultiplayerClient(appRoot)
-      if (client) {
-        client.pickHero(heroId)
-        // 显示等待界面
-        appRoot.innerHTML = `
-          <div class="room-lobby-overlay">
-            <div class="room-lobby-card">
-              <div class="room-lobby-title">已选择英雄</div>
-              <div class="room-lobby-status">等待对手选择英雄...</div>
-              <div class="room-waiting">
-                <div class="room-waiting-spinner"></div>
-              </div>
-            </div>
-          </div>
-        `
-      }
-    },
-    () => {
-      // 返回主菜单，断开连接
-      const client = getMultiplayerClient(appRoot)
-      if (client) client.disconnect()
-      showMainMenu()
-    },
-  )
 }
 
 // 启动：显示主菜单
