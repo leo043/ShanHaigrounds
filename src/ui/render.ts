@@ -869,17 +869,18 @@ export class GameUI {
         startY: touch.clientY,
         timer: setTimeout(() => {
           if (!touchDragData) return
-          // Long press confirmed — start drag
-          const c = card.cloneNode(true) as HTMLElement
-          c.classList.add('dragging')
-          c.style.position = 'fixed'
-          c.style.zIndex = '9999'
-          c.style.pointerEvents = 'none'
-          c.style.opacity = '0.85'
-          c.style.width = card.offsetWidth + 'px'
-          c.style.transform = 'scale(1.1)'
-          c.style.left = touch.clientX - card.offsetWidth / 2 + 'px'
-          c.style.top = touch.clientY - card.offsetHeight / 2 + 'px'
+          // Long press confirmed — create lightweight drag indicator
+          const c = document.createElement('div')
+          c.className = 'touch-drag-ghost'
+          c.style.cssText =
+            'position:fixed;z-index:9999;pointer-events:none;opacity:0.8;' +
+            'width:64px;height:80px;border-radius:8px;' +
+            'background:linear-gradient(180deg,rgba(201,161,74,0.6),rgba(192,57,43,0.4));' +
+            'border:2px solid rgba(201,161,74,0.8);box-shadow:0 4px 16px rgba(0,0,0,0.3);' +
+            'display:flex;align-items:center;justify-content:center;font-size:28px;'
+          c.textContent = '🃏'
+          c.style.left = touch.clientX - 32 + 'px'
+          c.style.top = touch.clientY - 40 + 'px'
           document.body.appendChild(c)
           touchDragData.clone = c
           touchDragData.active = true
@@ -891,6 +892,7 @@ export class GameUI {
       }
     }
 
+    let lastMoveTime = 0
     const onTouchMove = (e: TouchEvent) => {
       if (!touchDragData) return
       const touch = e.touches[0]
@@ -904,8 +906,14 @@ export class GameUI {
       }
       if (!touchDragData.active) return
       e.preventDefault()
-      touchDragData.clone.style.left = touch.clientX - touchDragData.clone.offsetWidth / 2 + 'px'
-      touchDragData.clone.style.top = touch.clientY - touchDragData.clone.offsetHeight / 2 + 'px'
+
+      // Throttle: max ~30fps for move handling
+      const now = performance.now()
+      if (now - lastMoveTime < 33) return
+      lastMoveTime = now
+
+      touchDragData.clone.style.left = touch.clientX - 32 + 'px'
+      touchDragData.clone.style.top = touch.clientY - 40 + 'px'
 
       // Highlight drop zone
       clearDragOver()
