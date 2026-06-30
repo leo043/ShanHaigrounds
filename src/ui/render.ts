@@ -91,12 +91,12 @@ export function renderMainMenu(
         <div class="main-menu-card" data-action="adventure">
           <div class="menu-card-icon">⚔</div>
           <div class="menu-card-title">冒险模式</div>
-          <div class="menu-card-desc">选择英雄，招募随从，击败对手</div>
+          <div class="menu-card-desc">与电脑对战快速上手</div>
         </div>
         <div class="main-menu-card" data-action="codex">
           <div class="menu-card-icon">📖</div>
           <div class="menu-card-title">随从图鉴</div>
-          <div class="menu-card-desc">浏览所有随从卡牌，了解技能详情</div>
+          <div class="menu-card-desc">浏览所有随从详情</div>
         </div>
       </div>
     </div>
@@ -424,6 +424,20 @@ function bindGlobalTooltip(): void {
       hideTooltip()
       return
     }
+    // Hero portrait hover → show skill tooltip
+    const heroBtn = (e.target as HTMLElement).closest('.hero-portrait-btn') as HTMLElement | null
+    if (heroBtn) {
+      const raw = heroBtn.getAttribute('data-hero-power')
+      if (raw) {
+        const t = ensureTooltip()
+        t.innerHTML = `<div style="font-family:var(--font-calligraphy);font-size:14px;color:var(--gold-light);margin-bottom:4px">英雄技能</div><div style="font-size:13px;line-height:1.5">${raw}</div>`
+        t.style.display = 'block'
+        const rect = heroBtn.getBoundingClientRect()
+        t.style.left = Math.min(rect.left, window.innerWidth - t.offsetWidth - 10) + 'px'
+        t.style.top = rect.bottom + 8 + 'px'
+      }
+      return
+    }
     const card = (e.target as HTMLElement).closest('[data-tooltip]') as HTMLElement | null
     if (!card) return
     const raw = card.getAttribute('data-tooltip')
@@ -470,6 +484,21 @@ function bindGlobalTooltip(): void {
     'touchstart',
     (e) => {
       const target = e.target as HTMLElement
+      // Hero portrait tap → show skill tooltip
+      const heroBtn = target.closest('.hero-portrait-btn') as HTMLElement | null
+      if (heroBtn) {
+        e.stopPropagation()
+        const raw = heroBtn.getAttribute('data-hero-power')
+        if (raw) {
+          const t = ensureTooltip()
+          t.innerHTML = `<div style="font-family:var(--font-calligraphy);font-size:14px;color:var(--gold-light);margin-bottom:4px">英雄技能</div><div style="font-size:13px;line-height:1.5">${raw}</div>`
+          t.style.display = 'block'
+          const rect = heroBtn.getBoundingClientRect()
+          t.style.left = Math.min(rect.left, window.innerWidth - t.offsetWidth - 10) + 'px'
+          t.style.top = rect.bottom + 8 + 'px'
+        }
+        return
+      }
       const card = target.closest('[data-tooltip]') as HTMLElement | null
       if (card && !isDragging) {
         const raw = card.getAttribute('data-tooltip')

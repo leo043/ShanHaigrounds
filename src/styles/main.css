@@ -37,6 +37,8 @@ body {
 #app {
   width: 100vw;
   height: 100vh;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+    env(safe-area-inset-left);
   background:
     radial-gradient(ellipse at top, rgba(201, 161, 74, 0.15), transparent 60%),
     radial-gradient(ellipse at bottom, rgba(192, 57, 43, 0.08), transparent 60%),
@@ -130,6 +132,15 @@ body {
   object-fit: cover;
   border-radius: 50%;
 }
+.hero-portrait-btn {
+  cursor: pointer;
+  transition:
+    transform 0.15s,
+    box-shadow 0.15s;
+}
+.hero-portrait-btn:active {
+  transform: scale(0.92);
+}
 .hero-portrait-fallback {
   font-family: var(--font-calligraphy);
   font-size: 24px;
@@ -148,7 +159,8 @@ body {
 .hero-name {
   font-family: var(--font-calligraphy);
   font-size: 15px;
-  color: var(--gold-light);
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
 }
 .hero-stats {
   font-size: 12px;

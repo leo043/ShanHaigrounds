@@ -161,7 +161,7 @@ export function heroHtml(p: PlayerState, isEnemy: boolean): string {
     : ``
 
   return `<div class="hero-bar">
-    <div class="hero-portrait">${portraitHtml}</div>
+    <div class="hero-portrait hero-portrait-btn" data-hero-power="${escapeAttr(h.powerName + '：' + h.powerDesc)}">${portraitHtml}</div>
     <div class="hero-info">
       <span class="hero-name">${h.name}${isEnemy ? '（敌）' : ''}</span>
       <span class="hero-stats">
