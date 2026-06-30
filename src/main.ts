@@ -147,16 +147,6 @@ class GameController {
       dealDamageToHero(this.state, 'player', result.damageToLoser)
     }
 
-    // 展示战斗结果状态（剩余随从带伤害）
-    this.ui.renderCombatStatic(
-      result.damagedSnap.p,
-      result.damagedSnap.e,
-      '',
-      result.winner === 'player' ? '胜利' : result.winner === 'enemy' ? '失败' : '平局',
-      `对英雄造成 ${result.damageToLoser} 点伤害`,
-    )
-    await delay(1500)
-
     // 恢复到回合开始时的阵容
     for (const m of playerSnapshot) {
       m.health = m.maxHealth

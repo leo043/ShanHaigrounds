@@ -80,17 +80,4 @@ export async function playCombatAnimation(
     }
     scrollLog()
   }
-
-  // 最终停留帧（存活随从回满血后的状态）
-  const winTitle =
-    result.winner === 'player' ? '大获全胜' : result.winner === 'enemy' ? '不敌败北' : '势均力敌'
-  const winSub =
-    result.winner === 'player'
-      ? `对敌方英雄造成 ${result.damageToLoser} 点伤害！`
-      : result.winner === 'enemy'
-        ? `我方英雄承受 ${result.damageToLoser} 点伤害`
-        : '双方旗鼓相当，各自退兵'
-  ui.renderCombatStatic(result.survivorBoard, result.enemySurvivorBoard, logHtml, winTitle, winSub)
-  scrollLog()
-  await delay(1300)
 }

@@ -423,8 +423,8 @@ body {
   height: 110px;
 }
 .combat-layout .card {
-  width: 90px;
-  height: 126px;
+  width: 76px;
+  height: 106px;
 }
 .card:hover {
   transform: translateY(-8px);

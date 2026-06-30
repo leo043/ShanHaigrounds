@@ -465,6 +465,45 @@ function bindGlobalTooltip(): void {
   document.addEventListener('dragover', () => {
     if (isDragging && tooltipEl) tooltipEl.style.display = 'none'
   })
+  // Touch tooltip: tap card to show, tap elsewhere to hide
+  document.addEventListener(
+    'touchstart',
+    (e) => {
+      const target = e.target as HTMLElement
+      const card = target.closest('[data-tooltip]') as HTMLElement | null
+      if (card && !isDragging) {
+        const raw = card.getAttribute('data-tooltip')
+        if (raw) {
+          const t = ensureTooltip()
+          t.innerHTML = raw
+            .replace(/&quot;/g, '"')
+            .replace(/&lt;/g, '<')
+            .replace(/&gt;/g, '>')
+          t.style.display = 'block'
+          const rect = card.getBoundingClientRect()
+          const tw = t.offsetWidth
+          const th = t.offsetHeight
+          const pad = 10
+          let left = rect.right + pad
+          let top = rect.top + rect.height / 2 - th / 2
+          if (left + tw > window.innerWidth - pad) left = rect.left - tw - pad
+          if (left < pad) {
+            left = rect.left + rect.width / 2 - tw / 2
+            top = rect.top - th - pad
+          }
+          if (top < pad) top = rect.bottom + pad
+          if (top + th > window.innerHeight - pad) top = window.innerHeight - th - pad
+          if (left < pad) left = pad
+          if (left + tw > window.innerWidth - pad) left = window.innerWidth - tw - pad
+          t.style.left = left + 'px'
+          t.style.top = top + 'px'
+        }
+      } else if (!card) {
+        hideTooltip()
+      }
+    },
+    { passive: true },
+  )
 }
 
 export class GameUI {
@@ -577,7 +616,7 @@ export class GameUI {
           ${synergyDockHtml(s.player.board)}
         </div>
         <div class="spacer"></div>
-        <button class="ctrl-btn ctrl-combat btn-primary" id="btn-combat">⚔ 开战！</button>
+        <button class="ctrl-btn ctrl-combat btn-primary" id="btn-combat">⚔</button>
       </div>
 
       <!-- ====== 主区域：垂直堆叠（对齐官方） ====== -->
@@ -593,10 +632,6 @@ export class GameUI {
 
         <!-- 战场区 -->
         <div class="board-section">
-          <div class="section-header">
-            <span class="section-label">我方阵容</span>
-            <span class="section-sub">${s.player.board.length}/7</span>
-          </div>
           <div class="board-zone" id="player-board">${boardCards}</div>
         </div>
 
